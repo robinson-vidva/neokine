@@ -6,7 +6,7 @@
   --line-2: #cdd3db;
   --ink: #171b21;
   --ink-dim: #4b5563;
-  --ink-faint: #7b8492;
+  --ink-faint: #616a78; /* darkened from #7b8492 (3.78:1) to meet WCAG AA (>=4.5:1) on the light panels; carries the honesty caveats */
   --accent: #d97a00;
   --accent-ink: #ffffff;
   --danger: #cf1d47;
@@ -84,10 +84,23 @@ body {
 }
 
 /* workspace: rail + stage */
-.workspace { display: grid; grid-template-columns: 296px 1fr; min-height: 0; }
+/* three regions: rail | stage (hero) | kinematics panel. The kin column is 0
+   until a video is processed; open = fixed width, collapsed = a thin strip. */
+.workspace {
+  display: grid;
+  grid-template-columns: 296px minmax(0, 1fr) var(--kin-col, 0px);
+  grid-template-areas: "rail stage kin";
+  min-height: 0;
+}
+body[data-kin="open"] { --kin-col: 344px; }
+body[data-kin="collapsed"] { --kin-col: 44px; }
 
-/* control rail */
+/* control rail. min-height:0 lets this grid item shrink below its content so
+   overflow-y actually engages and it scrolls (instead of spilling / letting the
+   canvas paint over it). */
 .rail {
+  grid-area: rail;
+  min-height: 0;
   border-right: 1px solid var(--line);
   background: var(--panel);
   overflow-y: auto;
@@ -279,7 +292,51 @@ input[type="range"]:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 /* kinematics */
-.kin canvas { width: 100%; height: auto; background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; }
+/* kinematics right-side panel */
+.kinpanel {
+  grid-area: kin;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+}
+.kinpanel[hidden] { display: none; }
+.kinpanel-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.kinpanel-title {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.kinpanel-toggle {
+  font: inherit; font-size: 11px; padding: 4px 9px;
+  border: 1px solid var(--line-2); border-radius: 2px;
+  background: var(--panel-2); color: var(--ink); cursor: pointer;
+}
+.kinpanel-toggle:hover { border-color: var(--accent); }
+/* the body scrolls independently; min-height:0 so overflow engages */
+.kinpanel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px; }
+
+/* collapsed: thin vertical strip with just the toggle */
+body[data-kin="collapsed"] .kinpanel-body { display: none; }
+body[data-kin="collapsed"] .kinpanel-title { display: none; }
+body[data-kin="collapsed"] .kinpanel-head { flex-direction: column; padding: 12px 4px; }
+body[data-kin="collapsed"] .kinpanel-toggle { writing-mode: vertical-rl; }
+
+/* small-multiples plot list */
+.kin-plots-list { display: flex; flex-direction: column; gap: 10px; }
+.kin-plot-item { }
+.kin-plot-name { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin-bottom: 3px; }
+.kin-plot-name .kin-sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+.kin-plot-scroll { overflow-x: auto; overflow-y: hidden; }
+.kin-plot-item canvas { display: block; background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; }
+.kin-zoom-lbl { display: inline-flex; margin-left: 8px; font-weight: 400; }
+
 .kin-joints { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
 .kin-metrics { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin: 8px 0; }
 .kin-metrics .kin-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
@@ -347,8 +404,10 @@ input[type="range"]:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* stage / canvas hero */
 .stage {
+  grid-area: stage;
   position: relative;
   min-width: 0;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -359,7 +418,7 @@ input[type="range"]:disabled { opacity: 0.45; cursor: not-allowed; }
   padding: 20px;
   overflow: hidden;
 }
-canvas {
+.stage canvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -433,9 +492,32 @@ video { display: none; }
 #status.error { color: var(--danger); }
 #status.ready { color: var(--ok); }
 
+/* medium: kinematics panel stacks BELOW the canvas (never squeezes it) */
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 296px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "rail stage" "kin kin";
+  }
+  .kinpanel {
+    border-left: none;
+    border-top: 1px solid var(--line);
+    max-height: 42vh;
+  }
+  body[data-kin="collapsed"] .kinpanel { max-height: none; }
+  body[data-kin="collapsed"] .kinpanel-head { flex-direction: row; padding: 10px 14px; }
+  body[data-kin="collapsed"] .kinpanel-title { display: inline; }
+  body[data-kin="collapsed"] .kinpanel-toggle { writing-mode: horizontal-tb; }
+}
+
+/* narrow: everything stacks (rail, stage, kinematics) */
 @media (max-width: 720px) {
   .app { height: auto; min-height: 100vh; }
-  .workspace { grid-template-columns: 1fr; }
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas: "rail" "stage" "kin";
+  }
   .rail { border-right: none; border-bottom: 1px solid var(--line); }
   .stage { min-height: 52vh; }
 }

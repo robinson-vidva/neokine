@@ -127,21 +127,33 @@ async function ensureLandmarker() {
 
 // --- canvas sizing + view transform ---
 
+// Main-canvas size in CSS pixels. ALL app coordinates (view, toCanvasPt, hit
+// testing, labels, clip) live in this CSS-px space; the backing store below is
+// dpr-scaled only so the overlay is crisp on retina.
+let cssW = 0, cssH = 0;
+// Clamp so a dpr-3 phone does not allocate an enormous backing store.
+function dprValue() { return Math.min(3, Math.max(1, window.devicePixelRatio || 1)); }
+
 function sizeCanvas() {
   const r = stage.getBoundingClientRect();
-  canvas.width = Math.max(1, Math.round(r.width));
-  canvas.height = Math.max(1, Math.round(r.height));
+  cssW = Math.max(1, Math.round(r.width));
+  cssH = Math.max(1, Math.round(r.height));
+  const dpr = dprValue();
+  // Backing store in DEVICE px; CSS display size stays the stage size via the
+  // `.stage canvas { width:100%; height:100% }` rule (we never set style.width).
+  canvas.width = Math.max(1, Math.round(cssW * dpr));
+  canvas.height = Math.max(1, Math.round(cssH * dpr));
 }
 
 function fitView() {
   if (!scene) return;
   const M = 16;
-  const cw = canvas.width - 2 * M;
-  const ch = canvas.height - 2 * M;
+  const cw = cssW - 2 * M;   // CSS px (fit is computed in CSS-px app space)
+  const ch = cssH - 2 * M;
   const a = Math.min(cw / scene.iw, ch / scene.ih);
   fitA = a;
   view = { a, e: M + (cw - scene.iw * a) / 2, f: M + (ch - scene.ih * a) / 2 };
-  viewFitDims = { iw: scene.iw, ih: scene.ih, cw: canvas.width, ch: canvas.height };
+  viewFitDims = { iw: scene.iw, ih: scene.ih, cw: cssW, ch: cssH };
 }
 
 // Refit when there is no view yet, or when the ACTUAL drawn image's dimensions
@@ -150,7 +162,7 @@ function fitView() {
 function ensureFit() {
   if (!view || !viewFitDims ||
       viewFitDims.iw !== scene.iw || viewFitDims.ih !== scene.ih ||
-      viewFitDims.cw !== canvas.width || viewFitDims.ch !== canvas.height) {
+      viewFitDims.cw !== cssW || viewFitDims.ch !== cssH) {
     fitView();
   }
 }
@@ -184,8 +196,8 @@ function placeLabels(indices, pts, bounds, jointIdx) {
   const placed = [];
   const jointPts = jointIdx.map((i) => pts[i]);
   const minX = Math.max(2, bounds.x + 2), minY = Math.max(2, bounds.y + 2);
-  const maxX = Math.min(canvas.width - 2, bounds.x + bounds.w - 2);
-  const maxY = Math.min(canvas.height - 2, bounds.y + bounds.h - 2);
+  const maxX = Math.min(cssW - 2, bounds.x + bounds.w - 2);
+  const maxY = Math.min(cssH - 2, bounds.y + bounds.h - 2);
   const dirs = [[1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [1, 1], [0, 1], [-1, 1]];
 
   for (const i of indices) {
@@ -249,9 +261,13 @@ function placeLabels(indices, pts, bounds, jointIdx) {
 
 function composite() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height); // clear the full backing store (device px)
   if (!scene) return;
   ensureFit();
+  // One transform maps CSS px -> device px, so every draw below stays in CSS px
+  // (view/toCanvasPt/clip/labels all unchanged) yet renders crisp on retina.
+  const dpr = dprValue();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const { iw, ih, mirror } = scene;
   const { a, e, f } = view;
 
@@ -347,11 +363,11 @@ function setVideoFrameScene(result) {
 function interactive() { return scene && scene.interactive && mode !== "webcam"; }
 
 function eventToCanvas(ev) {
+  // App space is CSS px (same space as toCanvasPt). The canvas display size IS
+  // its CSS-px size, so client px map straight in - no canvas.width/rect.width
+  // factor (the dpr scaling is handled by the ctx transform in composite()).
   const r = canvas.getBoundingClientRect();
-  return {
-    x: (ev.clientX - r.left) * (canvas.width / r.width),
-    y: (ev.clientY - r.top) * (canvas.height / r.height),
-  };
+  return { x: ev.clientX - r.left, y: ev.clientY - r.top };
 }
 
 function hitTest(ev) {
@@ -402,9 +418,9 @@ canvas.addEventListener("pointerdown", (ev) => {
 canvas.addEventListener("pointermove", (ev) => {
   if (!interactive()) return;
   if (pointer && interactions.zoom) {
-    const r = canvas.getBoundingClientRect();
-    const dx = (ev.clientX - pointer.x) * (canvas.width / r.width);
-    const dy = (ev.clientY - pointer.y) * (canvas.height / r.height);
+    // Pan in CSS px (client-px delta == CSS-px delta); no dpr factor.
+    const dx = ev.clientX - pointer.x;
+    const dy = ev.clientY - pointer.y;
     if (!panning && Math.abs(dx) + Math.abs(dy) > 4) panning = true;
     if (panning) { view.e = pointer.e + dx; view.f = pointer.f + dy; hideTooltip(); composite(); return; }
   }
@@ -639,16 +655,26 @@ async function processVideoFile(file) {
   lastVideoFile = file;
   el("video-name").textContent = file.name;
 
+  // Establish the processing guards SYNCHRONOUSLY, before the first await, so a
+  // second Update click during the video-load window is ignored: applyNow guards
+  // on videoProcessing, and setProcessingUI(true) disables the controls from the
+  // instant Update is clicked (not seconds later, after loadeddata).
+  videoProcessing = true;
+  setProcessingUI(true);
+
   videoURL = URL.createObjectURL(file);
   vidfile.src = videoURL;
   setStatus("Loading video...");
   if (vidfile.readyState < 2) await waitEvent(vidfile, "loadeddata");
-  if (myRun !== videoRunId) return;
-  if (!(await ensureLandmarker())) return;
+  if (myRun !== videoRunId) return; // superseded (cancel/new run owns the UI state)
+  if (!(await ensureLandmarker())) {
+    // Genuine failure (not superseded): release the guards we set above so the
+    // UI does not get stuck in the processing state.
+    if (myRun === videoRunId) { videoProcessing = false; setProcessingUI(false); }
+    return;
+  }
   if (myRun !== videoRunId) return;
 
-  videoProcessing = true;
-  setProcessingUI(true);
   setModelState("running", "running");
   const cap = videoDurationSec;               // seconds
   const step = 1 / videoFps;                   // seconds between samples
@@ -701,9 +727,15 @@ async function processVideoFile(file) {
   vidfile.removeAttribute("src");
   vidfile.load();
   el("rp-notice").textContent = "Sampled playback (~" + videoFps + " fps), not real-time. These are the sampled frames, not the source video.";
-  if (videoFrames.length) { replayIdx = videoFrames.length - 1; buildKinJoints(); await showReplayFrame(replayIdx); }
+  if (videoFrames.length) {
+    replayIdx = videoFrames.length - 1;
+    showKinPanel(true);   // show the panel FIRST so buildKinJoints -> rebuildKinPlots
+    buildKinJoints();     // can build/render the plots (it no-ops while hidden)
+    await showReplayFrame(replayIdx);
+  } else {
+    showKinPanel(false);
+  }
   updateReplayUI();
-  el("kin").hidden = videoFrames.length === 0;
 
   videoProcessing = false;
   setProcessingUI(false);
@@ -738,7 +770,7 @@ async function showReplayFrame(k) {
   stage.classList.add("has-image");
   poseCount.textContent = "poses: " + fr.result.landmarks.length;
   updateReplayUI();
-  drawKinCursor(); // scrub/play: only move the cursor (no recompute, no metrics rebuild)
+  blitAllKinCursors(); // scrub/play: only move the cursor (no recompute, no metrics rebuild)
 }
 
 function pauseReplay() {
@@ -771,16 +803,19 @@ function playReplay() {
 
 function updateReplayUI() {
   const M = videoFrames.length;
+  // replayIdx is briefly -1 while playReplay restarts from the end; clamp so the
+  // display never dereferences videoFrames[-1] (which threw and froze playback).
+  const idx = Math.max(0, Math.min(M - 1, replayIdx));
   el("replay").hidden = M === 0;
   el("rp-play").textContent = replayPlaying ? "Pause" : "Play";
   const sc = el("rp-scrub");
   sc.max = String(Math.max(0, M - 1));
-  sc.value = String(replayIdx);
+  sc.value = String(idx);
   el("rp-loop").checked = replayLoop;
-  const cur = M ? videoFrames[replayIdx].t : 0;
+  const cur = M ? videoFrames[idx].t : 0;
   const total = M ? videoFrames[M - 1].t : 0;
   el("rp-time").textContent = cur.toFixed(1) + "s / " + total.toFixed(1) + "s";
-  el("rp-counter").textContent = M ? "frame " + (replayIdx + 1) + " / " + M : "frame 0 / 0";
+  el("rp-counter").textContent = M ? "frame " + (idx + 1) + " / " + M : "frame 0 / 0";
 }
 
 function stopReplay() {
@@ -837,6 +872,21 @@ const KIN_COLORS = ["#2f6df6", "#e8590c", "#0ca678", "#ae3ec9", "#f08c00", "#e64
 let kinSelected = new Set([15, 16]); // default: both wrists
 let kinSmooth = false;
 
+// --- kinematics plot state (display only; the math below is unchanged) ---
+// One cached offscreen layer per selected joint (small multiples). Rendering is
+// split: renderAllKinPlots() draws each series to its offscreen layer once per
+// data/selection/zoom/resize change; blitAllKinCursors() only blits the cached
+// layer + the cursor line on every scrub. Instrumentation counters make the
+// "scrub redraws cursor only" claim verifiable.
+const kinPlots = new Map(); // idx -> { item, name, scroll, canvas, ctx, off, offctx, cssW, cssH, dpr }
+let kinZoom = false;        // false = fit-to-width envelope; true = fixed px/sample + horizontal scroll
+let kinCollapsed = false;
+let kinResizeObs = null;
+const KIN_PX_PER_SAMPLE = 6; // zoom mode: pixels per sample in the scroll container
+
+function jointName(idx) { return (KIN_JOINTS.find((j) => j[0] === idx) || [0, "?"])[1]; }
+function kinColor(idx) { return KIN_COLORS[[...kinSelected].indexOf(idx) % KIN_COLORS.length]; }
+
 function buildKinJoints() {
   invalidateKinCache(); // fresh data from a new process
   const host = el("kin-joints");
@@ -847,12 +897,12 @@ function buildKinJoints() {
     l.className = "check small";
     const c = document.createElement("input");
     c.type = "checkbox"; c.checked = kinSelected.has(idx);
-    c.addEventListener("change", () => { c.checked ? kinSelected.add(idx) : kinSelected.delete(idx); drawKinPlot(); });
+    c.addEventListener("change", () => { c.checked ? kinSelected.add(idx) : kinSelected.delete(idx); rebuildKinPlots(); });
     l.appendChild(c);
     const s = document.createElement("span"); s.textContent = label; l.appendChild(s);
     host.appendChild(l);
   }
-  drawKinPlot(); // populate metrics/plot for the initial selection
+  rebuildKinPlots(); // populate plots/metrics for the initial selection
 }
 
 function smoothInPlace(a) {
@@ -893,48 +943,174 @@ function kinMeanVel(s) {
   return dt > 0 ? kinPathLength(s) / dt : 0;
 }
 
-// Redraw the plot canvas only: trajectory lines (from cached series) + the
-// current-frame cursor. This is the ONLY kinematics work done on a scrub - no
-// series recompute, no metrics-DOM rebuild.
-function drawKinCursor() {
-  if (el("kin").hidden || !videoFrames.length) return;
-  const cv = el("kin-plot"), c = cv.getContext("2d");
-  if (!cv.width || !cv.height) return; // guard: zero-size canvas -> NaN scaling
-  c.clearRect(0, 0, cv.width, cv.height);
-  const total = videoFrames[videoFrames.length - 1].t || 1;
+// The x-axis is the GLOBAL clip time span so every small multiple is aligned
+// and shares one cursor. Series times are a subset of the frame times, so
+// mapping by the global span is exact.
+function kinTimeAxis() {
   const t0 = videoFrames[0].t;
-  const span = Math.max(1e-6, total - t0);
-  const X = (t) => 4 + ((t - t0) / span) * (cv.width - 8);
-  const Y = (v) => 4 + (1 - Math.max(0, Math.min(1, v))) * (cv.height - 8);
-  c.strokeStyle = "rgba(0,0,0,0.25)"; c.lineWidth = 1;
-  c.beginPath(); c.moveTo(X(videoFrames[replayIdx].t), 0); c.lineTo(X(videoFrames[replayIdx].t), cv.height); c.stroke();
-  [...kinSelected].forEach((idx, k) => {
-    const color = KIN_COLORS[k % KIN_COLORS.length];
-    const s = kinSeries(idx);
-    if (s.x.length < 2) return;
-    c.strokeStyle = color; c.lineWidth = 1.5; c.setLineDash([]);
-    c.beginPath(); for (let i = 0; i < s.x.length; i++) { const px = X(s.t[i]), py = Y(s.x[i]); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
-    c.setLineDash([3, 3]);
-    c.beginPath(); for (let i = 0; i < s.y.length; i++) { const px = X(s.t[i]), py = Y(s.y[i]); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
-    c.setLineDash([]);
-  });
+  const total = videoFrames[videoFrames.length - 1].t;
+  return { t0, span: Math.max(1e-6, total - t0) };
 }
 
-// Full refresh: canvas + per-joint metrics + asymmetry. Called only when the
-// selection, smoothing, or data changes - NOT on scrub.
-function drawKinPlot() {
-  if (el("kin").hidden || !videoFrames.length) return;
-  drawKinCursor();
-  const sel = [...kinSelected];
+// Draw one value-series (x or y) into an already-DPR-scaled context, in CSS px.
+// Fit mode with many samples per pixel would alias if drawn point-per-sample,
+// so at >= ~1.5 samples/px we draw a min/max envelope (one vertical bar per
+// pixel column, waveform-style); sparser data is drawn as a plain polyline.
+// Binning is a DISPLAY choice only - it does not touch the cached series or any
+// computed metric.
+function drawValueSeries(g, s, values, cssW, cssH, color, dashed) {
+  const n = values.length;
+  if (n < 2) return;
+  const ax = kinTimeAxis();
+  const pad = 3;
+  const X = (t) => ((t - ax.t0) / ax.span) * (cssW - 1);
+  const Y = (v) => pad + (1 - Math.max(0, Math.min(1, v))) * (cssH - 2 * pad);
+  g.strokeStyle = color;
+  g.lineWidth = 1;
+  if (n / cssW >= 1.5) {
+    // Envelope: per pixel column, the min..max of the samples falling in it.
+    const colMin = new Float32Array(cssW).fill(Infinity);
+    const colMax = new Float32Array(cssW).fill(-Infinity);
+    for (let i = 0; i < n; i++) {
+      let px = Math.round(X(s.t[i]));
+      if (px < 0) px = 0; else if (px >= cssW) px = cssW - 1;
+      const v = values[i];
+      if (v < colMin[px]) colMin[px] = v;
+      if (v > colMax[px]) colMax[px] = v;
+    }
+    g.setLineDash([]);
+    g.beginPath();
+    for (let px = 0; px < cssW; px++) {
+      if (colMax[px] < colMin[px]) continue; // empty column
+      g.moveTo(px + 0.5, Y(colMax[px]));
+      g.lineTo(px + 0.5, Y(colMin[px]) + 0.001);
+    }
+    g.stroke();
+  } else {
+    g.setLineDash(dashed ? [3, 3] : []);
+    g.beginPath();
+    for (let i = 0; i < n; i++) {
+      const px = X(s.t[i]), py = Y(values[i]);
+      i ? g.lineTo(px, py) : g.moveTo(px, py);
+    }
+    g.stroke();
+    g.setLineDash([]);
+  }
+}
+
+function makeKinPlot(idx) {
+  const item = document.createElement("div"); item.className = "kin-plot-item";
+  const name = document.createElement("div"); name.className = "kin-plot-name";
+  const sw = document.createElement("span"); sw.className = "kin-sw"; sw.style.background = kinColor(idx);
+  name.appendChild(sw); name.appendChild(document.createTextNode(jointName(idx)));
+  const scroll = document.createElement("div"); scroll.className = "kin-plot-scroll";
+  // An oversized <canvas> (a replaced element) does not expand its scroll
+  // container's scrollWidth on its own, so the horizontal scrollbar never
+  // appears in zoom mode. An inner wrapper sized in CSS px fixes that.
+  const inner = document.createElement("div"); inner.className = "kin-plot-canvas-wrap";
+  const canvas = document.createElement("canvas");
+  inner.appendChild(canvas); scroll.appendChild(inner);
+  item.appendChild(name); item.appendChild(scroll);
+  const off = document.createElement("canvas");
+  return { idx, item, name, sw, scroll, inner, canvas, ctx: canvas.getContext("2d"), off, offctx: off.getContext("2d"), cssW: 0, cssH: 56, dpr: 1 };
+}
+
+// Retina-correct sizing: back the canvas with cssW*dpr x cssH*dpr device pixels
+// and present it at cssW x cssH CSS px, else it renders blurry on dpr > 1.
+function sizeKinCanvas(p, cssW, cssH) {
+  const dpr = window.devicePixelRatio || 1;
+  const dw = Math.max(1, Math.round(cssW * dpr));
+  const dh = Math.max(1, Math.round(cssH * dpr));
+  for (const cv of [p.canvas, p.off]) { cv.width = dw; cv.height = dh; }
+  p.canvas.style.width = cssW + "px"; p.canvas.style.height = cssH + "px";
+  p.inner.style.width = cssW + "px"; p.inner.style.height = cssH + "px";
+  p.cssW = cssW; p.cssH = cssH; p.dpr = dpr;
+}
+
+// Render one plot's series to its cached offscreen layer (expensive; once per
+// data/selection/zoom/resize change).
+function renderKinOffscreen(p) {
+  const g = p.offctx;
+  if (!p.off.width || !p.off.height) return; // zero-size guard -> no NaN scaling
+  g.setTransform(p.dpr, 0, 0, p.dpr, 0, 0);
+  g.clearRect(0, 0, p.cssW, p.cssH);
+  // baseline
+  g.strokeStyle = "rgba(0,0,0,0.10)"; g.lineWidth = 1;
+  g.setLineDash([]); g.beginPath();
+  g.moveTo(0, p.cssH / 2 + 0.5); g.lineTo(p.cssW, p.cssH / 2 + 0.5); g.stroke();
+  const s = kinSeries(p.idx);
+  drawValueSeries(g, s, s.x, p.cssW, p.cssH, kinColor(p.idx), false);          // x
+  drawValueSeries(g, s, s.y, p.cssW, p.cssH, "rgba(90,100,110,0.85)", true);   // y
+}
+
+// Blit the cached layer + the current-frame cursor. Cheap; runs on every scrub.
+function blitKinPlot(p) {
+  const g = p.ctx;
+  if (!p.canvas.width || !p.canvas.height) return; // zero-size guard
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, p.canvas.width, p.canvas.height);
+  g.drawImage(p.off, 0, 0); // both device-pixel sized, 1:1
+  const ax = kinTimeAxis();
+  const cx = ((videoFrames[replayIdx].t - ax.t0) / ax.span) * (p.cssW - 1);
+  g.setTransform(p.dpr, 0, 0, p.dpr, 0, 0);
+  g.strokeStyle = "rgba(217,122,0,0.95)"; g.lineWidth = 1; g.setLineDash([]);
+  g.beginPath(); g.moveTo(cx + 0.5, 0); g.lineTo(cx + 0.5, p.cssH); g.stroke();
+  // Zoom mode: keep the cursor within the scroll viewport while scrubbing.
+  if (kinZoom) {
+    const view = p.scroll.clientWidth;
+    if (p.cssW > view) {
+      const target = cx - view / 2;
+      p.scroll.scrollLeft = Math.max(0, Math.min(p.cssW - view, target));
+    }
+  }
+}
+
+// Scrub path: blit every plot's cached layer + cursor. No series recompute, no
+// metrics-DOM rebuild.
+function blitAllKinCursors() {
+  if (el("kinpanel").hidden || kinCollapsed || !videoFrames.length) return;
+  for (const p of kinPlots.values()) blitKinPlot(p);
+}
+
+// Size + render + blit every plot. Called on data/selection/zoom/resize/reopen.
+function renderAllKinPlots() {
+  if (el("kinpanel").hidden || kinCollapsed || !videoFrames.length) return;
+  const body = el("kinpanel-body");
+  const avail = body.clientWidth - 26; // minus body padding
+  if (avail <= 0) return; // hidden/zero-width -> defer (ResizeObserver/reopen re-fires)
+  const n = videoFrames.length;
+  for (const p of kinPlots.values()) {
+    const cssW = kinZoom ? Math.max(avail, Math.round(n * KIN_PX_PER_SAMPLE)) : avail;
+    sizeKinCanvas(p, cssW, p.cssH);
+    renderKinOffscreen(p);
+    blitKinPlot(p);
+  }
+}
+
+// Reconcile the plot list with the current selection (add/remove/re-color),
+// then render. Keeps the swatch colors in sync since colors are position-based.
+function reconcileKinPlots() {
+  const host = el("kin-plots");
+  for (const idx of [...kinPlots.keys()]) {
+    if (!kinSelected.has(idx)) { kinPlots.get(idx).item.remove(); kinPlots.delete(idx); }
+  }
+  for (const idx of kinSelected) {
+    if (!kinPlots.has(idx)) { const p = makeKinPlot(idx); kinPlots.set(idx, p); host.appendChild(p.item); }
+  }
+  for (const p of kinPlots.values()) p.sw.style.background = kinColor(p.idx); // colors are selection-order based
+  if (!kinSelected.size) host.innerHTML = "";
+}
+
+// Per-joint displacement/velocity + left-right asymmetry. Math unchanged.
+function updateKinMetrics() {
   const metrics = el("kin-metrics");
+  const sel = [...kinSelected];
   metrics.innerHTML = "";
-  sel.forEach((idx, k) => {
+  sel.forEach((idx) => {
     const s = kinSeries(idx);
     if (s.x.length < 2) return;
-    const color = KIN_COLORS[k % KIN_COLORS.length];
-    const name = (KIN_JOINTS.find((j) => j[0] === idx) || [0, "?"])[1];
     const row = document.createElement("div"); row.className = "kin-row";
-    row.innerHTML = '<span><span class="kin-sw" style="background:' + color + '"></span>' + name + "</span>" +
+    row.innerHTML = '<span><span class="kin-sw" style="background:' + kinColor(idx) + '"></span>' + jointName(idx) + "</span>" +
       "<span>disp " + kinPathLength(s).toFixed(3) + " | vel " + kinMeanVel(s).toFixed(3) + "/s</span>";
     metrics.appendChild(row);
   });
@@ -948,6 +1124,37 @@ function drawKinPlot() {
   el("kin-asym").textContent = denom > 0 ? ai.toFixed(2) + " (" + side + ")" : "-";
 }
 
+// Full refresh: reconcile plots, render layers, update metrics. Called on
+// selection/smoothing/data/zoom change - NOT on scrub.
+function rebuildKinPlots() {
+  if (el("kinpanel").hidden || !videoFrames.length) return;
+  reconcileKinPlots();
+  renderAllKinPlots();
+  updateKinMetrics();
+}
+
+// Show/hide + expand/collapse the right-side panel. data-kin drives the grid
+// column width and the collapsed presentation (see styles.css).
+function showKinPanel(hasData) {
+  const panel = el("kinpanel");
+  if (!hasData) {
+    panel.hidden = true;
+    document.body.dataset.kin = "off";
+    return;
+  }
+  panel.hidden = false;
+  document.body.dataset.kin = kinCollapsed ? "collapsed" : "open";
+}
+
+function toggleKinPanel() {
+  kinCollapsed = !kinCollapsed;
+  document.body.dataset.kin = kinCollapsed ? "collapsed" : "open";
+  el("kin-toggle").textContent = kinCollapsed ? "Expand" : "Collapse";
+  // Expanding restores a non-zero body width; re-render the layers (they may
+  // have been sized against a 0-width body while collapsed).
+  if (!kinCollapsed) renderAllKinPlots();
+}
+
 function clearKinematics() {
   invalidateKinCache();
   kinSelected.clear();
@@ -957,17 +1164,31 @@ function clearKinematics() {
   if (el("kin-joints")) el("kin-joints").innerHTML = "";
   if (el("kin-metrics")) el("kin-metrics").innerHTML = "";
   if (el("kin-asym")) el("kin-asym").textContent = "-";
-  const kp = el("kin-plot"); if (kp) kp.getContext("2d").clearRect(0, 0, kp.width, kp.height);
-  const k = el("kin"); if (k) { k.hidden = true; k.open = false; }
+  for (const p of kinPlots.values()) p.item.remove();
+  kinPlots.clear();
+  if (el("kin-plots")) el("kin-plots").innerHTML = "";
+  showKinPanel(false);
 }
 
 el("kin-smooth").addEventListener("change", (e) => {
   kinSmooth = e.target.checked;
   el("kin-smooth-note").hidden = !kinSmooth;
   invalidateKinCache(); // smoothing changes the series
-  drawKinPlot();
+  rebuildKinPlots();
 });
-el("kin-pair").addEventListener("change", drawKinPlot);
+el("kin-pair").addEventListener("change", updateKinMetrics);
+el("kin-zoom").addEventListener("change", (e) => {
+  kinZoom = e.target.checked;
+  renderAllKinPlots(); // display-only: re-render layers at the new width
+});
+el("kin-toggle").addEventListener("click", toggleKinPanel);
+
+// Re-render the cached layers when the panel width changes (rail scroll, window
+// resize, responsive stack). Guarded against zero-size inside renderAllKinPlots.
+if (window.ResizeObserver) {
+  kinResizeObs = new ResizeObserver(() => renderAllKinPlots());
+  kinResizeObs.observe(el("kinpanel-body"));
+}
 
 el("video-input").addEventListener("change", (ev) => {
   const file = ev.target.files && ev.target.files[0];
@@ -1280,6 +1501,22 @@ window.addEventListener("pagehide", () => { teardownCamera(); cancelVideo(); });
 
 const ro = new ResizeObserver(() => { sizeCanvas(); if (scene) { fitView(); composite(); } });
 ro.observe(stage);
+
+// Re-crisp the backing store when devicePixelRatio changes (e.g. dragging the
+// window between a retina and a non-retina monitor). The CSS size may not change
+// then, so the ResizeObserver above won't fire; a matchMedia resolution listener
+// catches it. Re-registered each time because the query embeds the current dpr.
+function watchDprChange() {
+  const mq = window.matchMedia("(resolution: " + window.devicePixelRatio + "dppx)");
+  const onChange = () => {
+    sizeCanvas();
+    if (scene) { fitView(); composite(); }
+    watchDprChange(); // re-arm for the new dpr
+  };
+  if (mq.addEventListener) mq.addEventListener("change", onChange, { once: true });
+  else mq.addListener(onChange); // legacy Safari
+}
+watchDprChange();
 
 // initial load
 sizeCanvas();

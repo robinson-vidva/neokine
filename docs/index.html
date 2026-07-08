@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>neokine - neonatal pose visualization (demo)</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-mode="image">
@@ -96,50 +97,6 @@
               <p class="note dim" id="rp-notice">Sampled playback (~10 fps), not real-time. These are the sampled frames, not the source video.</p>
             </div>
 
-            <details class="kin group" id="kin" hidden>
-              <summary class="group-head">Kinematics (selected joints)</summary>
-              <p class="note dim">
-                Values are in NORMALIZED image units per second, not physical
-                units. There is no camera calibration, depth, or scale reference,
-                so these cannot be converted to cm/s. Frames are sampled, so fast
-                motion may alias. Camera motion is indistinguishable from subject
-                motion. Distal joints (wrists, ankles, hips) carry the largest
-                positional error, so their velocity is the least reliable -
-                relative comparisons within one clip are more meaningful than
-                absolute values. This is a visualization POC, not a measurement;
-                the Python CLI is the source of truth.
-              </p>
-              <div class="field">
-                <div class="field-label">Track joints / regions</div>
-                <div id="kin-joints" class="kin-joints"></div>
-              </div>
-              <label class="check small"><input type="checkbox" id="kin-smooth" /><span>Smooth (3-frame average) before velocity</span></label>
-              <p class="note dim" id="kin-smooth-note" hidden>Smoothing changes the velocity estimate.</p>
-              <div class="field">
-                <div class="field-label">Trajectory: x (solid) and y (dashed) over time</div>
-                <canvas id="kin-plot" width="264" height="150"></canvas>
-              </div>
-              <div id="kin-metrics" class="kin-metrics"></div>
-              <div class="field" id="kin-asym-wrap">
-                <div class="field-label">Left-right asymmetry</div>
-                <div class="row-inline">
-                  <select id="kin-pair" class="select">
-                    <option value="15,16">wrists</option>
-                    <option value="13,14">elbows</option>
-                    <option value="11,12">shoulders</option>
-                    <option value="23,24">hips</option>
-                    <option value="25,26">knees</option>
-                    <option value="27,28">ankles</option>
-                  </select>
-                  <span id="kin-asym" class="kin-asym-val">-</span>
-                </div>
-                <p class="note dim">
-                  Asymmetry index = (L - R) / (L + R), range -1..1, from total
-                  displacement of the chosen pair. 0 = symmetric; positive = left
-                  side moved more, negative = right.
-                </p>
-              </div>
-            </details>
           </div>
 
           <div class="mode-panel" data-for="webcam" hidden>
@@ -199,7 +156,7 @@
           </p>
         </section>
 
-        <details class="group advanced">
+        <details class="group advanced" open>
           <summary class="group-head">Advanced options</summary>
           <p class="note">
             These change what the demo shows, not measured accuracy. Lower
@@ -264,6 +221,59 @@
         <button type="button" class="stage-btn" id="resetview" hidden>Reset view</button>
         <div class="tooltip" id="tooltip" hidden></div>
       </main>
+
+      <aside class="kinpanel" id="kinpanel" hidden>
+        <div class="kinpanel-head">
+          <span class="kinpanel-title">Kinematics</span>
+          <button type="button" class="kinpanel-toggle" id="kin-toggle" title="Collapse / expand">Collapse</button>
+        </div>
+        <div class="kinpanel-body" id="kinpanel-body">
+          <p class="note dim">
+            Values are in NORMALIZED image units per second, not physical units.
+            There is no camera calibration, depth, or scale reference, so these
+            cannot be converted to cm/s. Frames are sampled, so fast motion may
+            alias. Camera motion is indistinguishable from subject motion. Distal
+            joints (wrists, ankles, hips) carry the largest positional error, so
+            their velocity is the least reliable - relative comparisons within one
+            clip are more meaningful than absolute values. This is a visualization
+            POC, not a measurement; the Python CLI is the source of truth.
+          </p>
+          <div class="field">
+            <div class="field-label">Track joints / regions</div>
+            <div id="kin-joints" class="kin-joints"></div>
+          </div>
+          <label class="check small"><input type="checkbox" id="kin-smooth" /><span>Smooth (3-frame average) before velocity</span></label>
+          <p class="note dim" id="kin-smooth-note" hidden>Smoothing changes the velocity estimate.</p>
+          <div class="field">
+            <div class="field-label">
+              Trajectory: x (colored) and y (gray) over time
+              <label class="check small kin-zoom-lbl"><input type="checkbox" id="kin-zoom" /><span>Zoom</span></label>
+            </div>
+            <p class="note dim">Binning affects the display only - the displacement, velocity, and asymmetry values are unchanged.</p>
+            <div id="kin-plots" class="kin-plots-list"></div>
+          </div>
+          <div id="kin-metrics" class="kin-metrics"></div>
+          <div class="field" id="kin-asym-wrap">
+            <div class="field-label">Left-right asymmetry</div>
+            <div class="row-inline">
+              <select id="kin-pair" class="select">
+                <option value="15,16">wrists</option>
+                <option value="13,14">elbows</option>
+                <option value="11,12">shoulders</option>
+                <option value="23,24">hips</option>
+                <option value="25,26">knees</option>
+                <option value="27,28">ankles</option>
+              </select>
+              <span id="kin-asym" class="kin-asym-val">-</span>
+            </div>
+            <p class="note dim">
+              Asymmetry index = (L - R) / (L + R), range -1..1, from total
+              displacement of the chosen pair. 0 = symmetric; positive = left side
+              moved more, negative = right.
+            </p>
+          </div>
+        </div>
+      </aside>
     </div>
 
     <footer class="statusbar">
