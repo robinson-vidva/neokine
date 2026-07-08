@@ -106,7 +106,7 @@ async function ensureLandmarker() {
   if (landmarker && builtMode === rmode && builtVariant === variant && !dirty) return true;
   setModelState("loading", "loading model");
   try {
-    const next = await createLandmarker({ ...settings, variant }, rmode);
+    const next = await createLandmarker({ ...settings, variant }, rmode, (msg) => setStatus(msg + "..."));
     if (landmarker) landmarker.close();
     landmarker = next;
     builtMode = rmode;

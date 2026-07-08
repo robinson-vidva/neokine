@@ -4,13 +4,24 @@
 // factory plus the static skeleton/label constants; all drawing and
 // interaction live in app.js.
 
-import {
-  PoseLandmarker,
-  FilesetResolver,
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
-
+// The MediaPipe library is imported lazily (dynamic import) rather than as a
+// top-level static import. A static import that stalls or errors (as it can in
+// Safari) would prevent this whole module - and therefore the entire app - from
+// ever running, leaving a silent "loading" state. Lazy + timed loading keeps
+// the UI alive and surfaces any failure as a visible error.
+const TASKS_VISION_URL =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 const WASM_BASE =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+
+let mpLib = null;
+async function loadMP(onStage) {
+  if (!mpLib) {
+    if (onStage) onStage("loading MediaPipe library");
+    mpLib = await withTimeout(import(TASKS_VISION_URL), 20000, "MediaPipe library");
+  }
+  return mpLib;
+}
 
 export const MODEL_URLS = {
   lite: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
@@ -80,13 +91,21 @@ export function jointColor(i) {
 }
 
 let vision = null;
-async function getVision() {
-  if (!vision) vision = await FilesetResolver.forVisionTasks(WASM_BASE);
+async function getVision(onStage) {
+  const { FilesetResolver } = await loadMP(onStage);
+  if (!vision) {
+    if (onStage) onStage("loading vision runtime (WASM)");
+    // ~9 MB WASM from the CDN; time out rather than hang forever if it stalls.
+    vision = await withTimeout(FilesetResolver.forVisionTasks(WASM_BASE), 30000, "WASM runtime");
+  }
   return vision;
 }
 
-export async function createLandmarker(settings, runningMode) {
-  const v = await getVision();
+// onStage(message) is optional; it surfaces which step is in progress so a
+// stall is visible on screen instead of a generic "loading model".
+export async function createLandmarker(settings, runningMode, onStage) {
+  const { PoseLandmarker } = await loadMP(onStage);
+  const v = await getVision(onStage);
   const opts = (delegate) => ({
     baseOptions: { modelAssetPath: MODEL_URLS[settings.variant], delegate },
     runningMode,
@@ -95,9 +114,23 @@ export async function createLandmarker(settings, runningMode) {
     minPosePresenceConfidence: settings.minPresence,
     minTrackingConfidence: 0.5,
   });
+  // Try the GPU delegate first, but cap it: on some browsers (notably Safari)
+  // GPU init can hang forever instead of rejecting, which would leave the app
+  // stuck on "loading model". If it does not resolve in time, or it rejects,
+  // fall back to the CPU delegate (slower but reliable everywhere).
   try {
-    return await PoseLandmarker.createFromOptions(v, opts("GPU"));
+    if (onStage) onStage("loading " + settings.variant + " model (GPU)");
+    return await withTimeout(PoseLandmarker.createFromOptions(v, opts("GPU")), 6000, "GPU model");
   } catch (e) {
-    return await PoseLandmarker.createFromOptions(v, opts("CPU"));
+    if (onStage) onStage("GPU unavailable; loading " + settings.variant + " model (CPU)");
+    return await withTimeout(PoseLandmarker.createFromOptions(v, opts("CPU")), 30000, "CPU model");
   }
+}
+
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error((label || "init") + " timed out after " + (ms / 1000) + "s")), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
