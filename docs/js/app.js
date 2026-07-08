@@ -848,7 +848,6 @@ function updateFrameCountNote() {
   const est = Math.min(VIDEO_MAX_FRAMES, Math.ceil(videoDurationSec * videoFps));
   el("vid-frames-note").textContent = "about " + est + " frames (hard cap " + VIDEO_MAX_FRAMES + ")";
   el("vid-heavy-note").hidden = est <= VIDEO_HEAVY_FRAMES;
-  el("vid-dur-txt").textContent = String(videoDurationSec);
 }
 el("vid-duration").addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-sec]"); if (!b) return;
@@ -1521,6 +1520,84 @@ function watchDprChange() {
   else mq.addListener(onChange); // legacy Safari
 }
 watchDprChange();
+
+// --- logo click: full reset to first-load state (in-page, no navigation) ---
+// resetWorkspace() is the real teardown (stops webcam, cancels in-flight video
+// processing, clears the loaded input/canvas/replay/kinematics); then restore
+// default mode/settings and the expanded sections, exactly as on first load.
+function resetApp() {
+  resetWorkspace();
+  mode = "image";
+  document.body.dataset.mode = mode;
+  for (const b of document.querySelectorAll(".mode-btn[data-mode]")) b.classList.toggle("is-active", b.dataset.mode === mode);
+  for (const p of document.querySelectorAll(".mode-panel")) p.hidden = p.dataset.for !== mode;
+  placeholderText.textContent = PLACEHOLDER.image;
+  const adv = document.querySelector("details.advanced"); if (adv) adv.open = true; // sections expanded as on load
+  resetSettings(); // default variant/sliders/Face-off/interactions (composites the now-empty scene)
+  setModelState("ready", "ready");
+  setStatus(MODE_STATUS.image, "ready");
+}
+el("brand-reset").addEventListener("click", (e) => { e.preventDefault(); resetApp(); });
+
+// --- (i) info popovers: tap/click/keyboard to toggle, hover to preview on
+// desktop. Rendered position:fixed and appended to <body> so the rail's
+// overflow scroll never clips it. Escape and outside-click dismiss. ---
+(function initInfoPopovers() {
+  const pop = document.createElement("div");
+  pop.className = "infopop"; pop.id = "infopop"; pop.setAttribute("role", "tooltip"); pop.hidden = true;
+  document.body.appendChild(pop);
+  let cur = null, sticky = false;
+
+  function place(btn) {
+    const r = btn.getBoundingClientRect();
+    const pad = 8, pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left = r.right + pad;
+    if (left + pw > window.innerWidth - pad) left = r.left - pw - pad;   // flip to the left
+    left = Math.max(pad, Math.min(left, window.innerWidth - pw - pad));
+    let top = Math.min(r.top, window.innerHeight - ph - pad);
+    top = Math.max(pad, top);
+    pop.style.left = Math.round(left) + "px";
+    pop.style.top = Math.round(top) + "px";
+  }
+  function show(btn, isSticky) {
+    if (cur && cur !== btn) hide();
+    pop.textContent = btn.getAttribute("data-info") || "";
+    pop.hidden = false;
+    cur = btn; sticky = isSticky;
+    btn.setAttribute("aria-expanded", "true");
+    btn.setAttribute("aria-describedby", "infopop");
+    place(btn);
+  }
+  function hide() {
+    if (!cur) return;
+    cur.setAttribute("aria-expanded", "false");
+    cur.removeAttribute("aria-describedby");
+    cur = null; sticky = false; pop.hidden = true;
+  }
+  // click = tap = keyboard (buttons fire click on Enter/Space). preventDefault so
+  // an (i) inside a <summary> does not also toggle the <details>.
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".info");
+    if (btn) { e.preventDefault(); e.stopPropagation(); (cur === btn && sticky) ? hide() : show(btn, true); return; }
+    if (cur && !pop.contains(e.target)) hide();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && cur) { const b = cur; hide(); b.focus(); } });
+  // Optional desktop hover preview (tap remains the primary path; skip on touch).
+  document.addEventListener("pointerover", (e) => {
+    if (e.pointerType === "touch") return;
+    const btn = e.target.closest(".info");
+    if (btn && !sticky) show(btn, false);
+  });
+  document.addEventListener("pointerout", (e) => {
+    if (e.pointerType === "touch") return;
+    const btn = e.target.closest(".info");
+    if (btn && cur === btn && !sticky) hide();
+  });
+  window.addEventListener("resize", hide);
+  const reflow = () => { if (cur) place(cur); };
+  document.querySelector(".rail") && document.querySelector(".rail").addEventListener("scroll", reflow);
+  const kb = document.getElementById("kinpanel-body"); if (kb) kb.addEventListener("scroll", reflow);
+})();
 
 // initial load
 sizeCanvas();

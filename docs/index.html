@@ -3,17 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>neokine - neonatal pose visualization (demo)</title>
+  <title>neokine - Neonatal Kinematics (demo)</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-mode="image">
   <div class="app">
     <header class="topbar">
-      <div class="brand">
+      <button type="button" class="brand" id="brand-reset" aria-label="Reset neokine" title="Reset neokine">
         <span class="mark">neokine</span>
-        <span class="sub">neonatal pose visualization / demo</span>
-      </div>
+        <span class="expand">Neonatal Kinematics</span>
+        <span class="sub">pose visualization / demo</span>
+      </button>
       <div class="model-state" id="model-state" data-state="loading">
         <span class="dot"></span><span class="label" id="model-state-label">loading model</span>
       </div>
@@ -58,7 +59,7 @@
               </div>
             </div>
             <div class="field">
-              <div class="field-label">Sampling rate</div>
+              <div class="field-label">Sampling rate <button type="button" class="info" aria-label="About video sampling" aria-expanded="false" data-info="Processes only the first few seconds you set as the duration cap, sampled at the selected rate. Frames are processed in memory and discarded; the processed video is not saved. Because frames are sampled, this is a visualization, not a measurement.">i</button></div>
               <div class="segmented" id="vid-fps" role="radiogroup" aria-label="Sampling rate">
                 <button type="button" data-fps="10" role="radio" aria-checked="true">10 fps</button>
                 <button type="button" data-fps="15" role="radio" aria-checked="false">15 fps</button>
@@ -67,13 +68,6 @@
             </div>
             <p class="note dim" id="vid-frames-note">about 100 frames</p>
             <p class="note dim warn" id="vid-heavy-note" hidden>This will take a while to process.</p>
-
-            <p class="note">
-              Processes the first <span id="vid-dur-txt">10</span> seconds only,
-              sampled at the selected rate. Frames are processed in memory and
-              discarded; the processed video is not saved. Because frames are
-              sampled, this is a visualization, not a measurement.
-            </p>
 
             <p class="note warn" id="vid-dirty" hidden>Settings changed - click Update to reprocess.</p>
             <div class="cam-controls" id="vid-proc" hidden>
@@ -138,7 +132,7 @@
         <section class="group">
           <div class="group-head">Overlay</div>
           <div class="field">
-            <div class="field-label">Point labels</div>
+            <div class="field-label">Point labels <button type="button" class="info" aria-label="About point labels and the landmark model" aria-expanded="false" data-info="Points follow the MediaPipe 33-landmark body model. Labels mark the main joints; pinned joints stay labeled in either mode.">i</button></div>
             <div class="radios" id="labelmode">
               <label class="radio"><input type="radio" name="labelmode" value="hover" checked /><span>On hover / selected</span></label>
               <label class="radio"><input type="radio" name="labelmode" value="always" /><span>Always show</span></label>
@@ -150,19 +144,10 @@
             <span class="legend-item"><i style="background:#4c6ef5"></i>Torso</span>
             <span class="legend-item"><i style="background:#adb5bd"></i>Face</span>
           </div>
-          <p class="note dim">
-            Points follow the MediaPipe 33-landmark body model. Labels mark the
-            main joints; pinned joints stay labeled in either mode.
-          </p>
         </section>
 
         <details class="group advanced" open>
-          <summary class="group-head">Advanced options</summary>
-          <p class="note">
-            These change what the demo shows, not measured accuracy. Lower
-            confidence is not better. The Python CLI remains the source of truth
-            for accuracy.
-          </p>
+          <summary class="group-head">Advanced options <button type="button" class="info" aria-label="About advanced options" aria-expanded="false" data-info="These change what the demo shows, not measured accuracy. Lower confidence is not better. The Python CLI remains the source of truth for accuracy.">i</button></summary>
           <div class="field">
             <div class="field-label">
               minPoseDetectionConfidence <output id="det-val">0.50</output>
@@ -177,11 +162,7 @@
           </div>
           <p class="note dim" id="apply-note">Applied automatically to the current input.</p>
 
-          <div class="subhead">Points shown (display filter)</div>
-          <p class="note dim">
-            Hides points on the overlay only. The model still outputs all 33
-            landmarks - this does not change detection or speed anything up.
-          </p>
+          <div class="subhead">Points shown (display filter) <button type="button" class="info" aria-label="About the display filter" aria-expanded="false" data-info="Hides points on the overlay only. The model still outputs all 33 landmarks; this does not change detection or speed anything up.">i</button></div>
           <label class="check master"><input type="checkbox" id="filter-all" /><span>Show all / hide all</span></label>
           <div id="filters"></div>
 
@@ -228,15 +209,9 @@
           <button type="button" class="kinpanel-toggle" id="kin-toggle" title="Collapse / expand">Collapse</button>
         </div>
         <div class="kinpanel-body" id="kinpanel-body">
-          <p class="note dim">
-            Values are in NORMALIZED image units per second, not physical units.
-            There is no camera calibration, depth, or scale reference, so these
-            cannot be converted to cm/s. Frames are sampled, so fast motion may
-            alias. Camera motion is indistinguishable from subject motion. Distal
-            joints (wrists, ankles, hips) carry the largest positional error, so
-            their velocity is the least reliable - relative comparisons within one
-            clip are more meaningful than absolute values. This is a visualization
-            POC, not a measurement; the Python CLI is the source of truth.
+          <p class="note kin-caveat">
+            Visualization only - normalized image units, sampled, not a measurement.
+            <button type="button" class="info" aria-label="Kinematics caveats in full" aria-expanded="false" data-info="Values are in normalized image units per second, not physical units. There is no camera calibration, depth, or scale reference, so these cannot be converted to cm/s. Frames are sampled, so fast motion may alias. Camera motion is indistinguishable from subject motion. Distal joints (wrists, ankles, hips) carry the largest positional error, so their velocity is the least reliable; relative comparisons within one clip are more meaningful than absolute values. This is a visualization POC, not a measurement; the Python CLI is the source of truth.">i</button>
           </p>
           <div class="field">
             <div class="field-label">Track joints / regions</div>
@@ -266,10 +241,9 @@
               </select>
               <span id="kin-asym" class="kin-asym-val">-</span>
             </div>
-            <p class="note dim">
-              Asymmetry index = (L - R) / (L + R), range -1..1, from total
-              displacement of the chosen pair. 0 = symmetric; positive = left side
-              moved more, negative = right.
+            <p class="note kin-caveat">
+              Asymmetry index = (L - R) / (L + R)
+              <button type="button" class="info" aria-label="How the asymmetry index is defined" aria-expanded="false" data-info="Range -1 to 1, computed from the total displacement of the chosen pair. 0 = symmetric; positive = left side moved more, negative = right.">i</button>
             </p>
           </div>
         </div>
