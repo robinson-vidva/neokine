@@ -580,6 +580,32 @@ let replayTimer = null;
 let replayBitmap = null; // currently decoded frame (closed when replaced)
 let replayToken = 0;     // guards out-of-order async decodes during scrubbing
 let replayPlayToken = 0; // ensures at most one play loop exists at a time
+let videoDirty = false;      // video-mode settings changed since last process
+let videoProcessing = false; // a processVideoFile loop is currently running
+
+// In video mode a reprocess is expensive, so settings changes only mark dirty
+// and show an indicator; the user reprocesses once via Update.
+function markVideoDirty() {
+  if (mode !== "video" || !lastVideoFile) return;
+  videoDirty = true;
+  el("vid-dirty").hidden = false;
+}
+function clearVideoDirty() {
+  videoDirty = false;
+  el("vid-dirty").hidden = true;
+}
+// Enable/disable the reprocess-triggering controls and toggle the Cancel button
+// while a video is processing. Kinematics/scrub stay responsive (they do not
+// reprocess), and the progress indicator + Cancel remain live.
+function setProcessingUI(on) {
+  ["#variant button", "#numposes button", "#vid-duration button", "#vid-fps button"]
+    .forEach((sel) => document.querySelectorAll(sel).forEach((b) => { b.disabled = on; }));
+  el("det").disabled = on;
+  el("pres").disabled = on;
+  el("apply-btn").disabled = on;
+  el("reset-btn").disabled = on;
+  el("vid-proc").hidden = !on;
+}
 
 function cancelVideo() {
   videoRunId++;
@@ -621,6 +647,8 @@ async function processVideoFile(file) {
   if (!(await ensureLandmarker())) return;
   if (myRun !== videoRunId) return;
 
+  videoProcessing = true;
+  setProcessingUI(true);
   setModelState("running", "running");
   const cap = videoDurationSec;               // seconds
   const step = 1 / videoFps;                   // seconds between samples
@@ -645,6 +673,7 @@ async function processVideoFile(file) {
     } catch (e) { /* skip a bad frame */ }
     if (frameResult) {
       const capd = await frameToBlob(vidfile, vidfile.videoWidth, vidfile.videoHeight);
+      if (myRun !== videoRunId) return; // cancelled during encode: do not push or overwrite status
       videoFrames.push({ t: actual, result: frameResult, blob: capd.blob, w: capd.w, h: capd.h });
     }
     count++;
@@ -676,6 +705,9 @@ async function processVideoFile(file) {
   updateReplayUI();
   el("kin").hidden = videoFrames.length === 0;
 
+  videoProcessing = false;
+  setProcessingUI(false);
+  clearVideoDirty();
   setModelState("ready", "ready");
   setStatus("Processed " + (longer ? "first " + cap + " seconds" : "video") + " (" + count + " frames at " + videoFps + " fps).", "ready");
 }
@@ -706,7 +738,7 @@ async function showReplayFrame(k) {
   stage.classList.add("has-image");
   poseCount.textContent = "poses: " + fr.result.landmarks.length;
   updateReplayUI();
-  drawKinPlot(); // moves the current-frame cursor on the trajectory plot
+  drawKinCursor(); // scrub/play: only move the cursor (no recompute, no metrics rebuild)
 }
 
 function pauseReplay() {
@@ -784,12 +816,14 @@ el("vid-duration").addEventListener("click", (ev) => {
   videoDurationSec = Number(b.dataset.sec);
   for (const x of el("vid-duration").querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
   updateFrameCountNote();
+  markVideoDirty();
 });
 el("vid-fps").addEventListener("click", (ev) => {
   const b = ev.target.closest("button[data-fps]"); if (!b) return;
   videoFps = Number(b.dataset.fps);
   for (const x of el("vid-fps").querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
   updateFrameCountNote();
+  markVideoDirty();
 });
 
 // --- kinematics (Part D): computed from the cached per-frame landmarks ---
@@ -804,6 +838,7 @@ let kinSelected = new Set([15, 16]); // default: both wrists
 let kinSmooth = false;
 
 function buildKinJoints() {
+  invalidateKinCache(); // fresh data from a new process
   const host = el("kin-joints");
   host.innerHTML = "";
   if (kinSelected.size === 0) kinSelected = new Set([15, 16]);
@@ -817,6 +852,7 @@ function buildKinJoints() {
     const s = document.createElement("span"); s.textContent = label; l.appendChild(s);
     host.appendChild(l);
   }
+  drawKinPlot(); // populate metrics/plot for the initial selection
 }
 
 function smoothInPlace(a) {
@@ -827,8 +863,15 @@ function smoothInPlace(a) {
     a[i] = s / n;
   }
 }
-// Normalized-image-unit series for one joint across the sampled frames.
+// Normalized-image-unit series per joint, cached. The series only depend on the
+// cached landmarks + smoothing, so they are computed once and reused across
+// scrubs; invalidateKinCache() is called when the data or smoothing changes.
+let kinSeriesCache = null;
+function invalidateKinCache() { kinSeriesCache = null; }
 function kinSeries(idx) {
+  if (!kinSeriesCache) kinSeriesCache = new Map();
+  const hit = kinSeriesCache.get(idx);
+  if (hit) return hit;
   const t = [], x = [], y = [];
   for (const fr of videoFrames) {
     const lm = fr.result.landmarks[0] && fr.result.landmarks[0][idx];
@@ -836,7 +879,9 @@ function kinSeries(idx) {
     t.push(fr.t); x.push(lm.x); y.push(lm.y);
   }
   if (kinSmooth) { smoothInPlace(x); smoothInPlace(y); }
-  return { t, x, y };
+  const s = { t, x, y };
+  kinSeriesCache.set(idx, s);
+  return s;
 }
 function kinPathLength(s) {
   let d = 0;
@@ -848,34 +893,45 @@ function kinMeanVel(s) {
   return dt > 0 ? kinPathLength(s) / dt : 0;
 }
 
-function drawKinPlot() {
+// Redraw the plot canvas only: trajectory lines (from cached series) + the
+// current-frame cursor. This is the ONLY kinematics work done on a scrub - no
+// series recompute, no metrics-DOM rebuild.
+function drawKinCursor() {
   if (el("kin").hidden || !videoFrames.length) return;
   const cv = el("kin-plot"), c = cv.getContext("2d");
+  if (!cv.width || !cv.height) return; // guard: zero-size canvas -> NaN scaling
   c.clearRect(0, 0, cv.width, cv.height);
-  const sel = [...kinSelected];
   const total = videoFrames[videoFrames.length - 1].t || 1;
   const t0 = videoFrames[0].t;
   const span = Math.max(1e-6, total - t0);
   const X = (t) => 4 + ((t - t0) / span) * (cv.width - 8);
   const Y = (v) => 4 + (1 - Math.max(0, Math.min(1, v))) * (cv.height - 8);
-
-  // current-frame cursor
   c.strokeStyle = "rgba(0,0,0,0.25)"; c.lineWidth = 1;
   c.beginPath(); c.moveTo(X(videoFrames[replayIdx].t), 0); c.lineTo(X(videoFrames[replayIdx].t), cv.height); c.stroke();
-
-  const metrics = el("kin-metrics");
-  metrics.innerHTML = "";
-  sel.forEach((idx, k) => {
+  [...kinSelected].forEach((idx, k) => {
     const color = KIN_COLORS[k % KIN_COLORS.length];
     const s = kinSeries(idx);
     if (s.x.length < 2) return;
-    // x(t) solid
     c.strokeStyle = color; c.lineWidth = 1.5; c.setLineDash([]);
     c.beginPath(); for (let i = 0; i < s.x.length; i++) { const px = X(s.t[i]), py = Y(s.x[i]); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
-    // y(t) dashed
     c.setLineDash([3, 3]);
     c.beginPath(); for (let i = 0; i < s.y.length; i++) { const px = X(s.t[i]), py = Y(s.y[i]); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
     c.setLineDash([]);
+  });
+}
+
+// Full refresh: canvas + per-joint metrics + asymmetry. Called only when the
+// selection, smoothing, or data changes - NOT on scrub.
+function drawKinPlot() {
+  if (el("kin").hidden || !videoFrames.length) return;
+  drawKinCursor();
+  const sel = [...kinSelected];
+  const metrics = el("kin-metrics");
+  metrics.innerHTML = "";
+  sel.forEach((idx, k) => {
+    const s = kinSeries(idx);
+    if (s.x.length < 2) return;
+    const color = KIN_COLORS[k % KIN_COLORS.length];
     const name = (KIN_JOINTS.find((j) => j[0] === idx) || [0, "?"])[1];
     const row = document.createElement("div"); row.className = "kin-row";
     row.innerHTML = '<span><span class="kin-sw" style="background:' + color + '"></span>' + name + "</span>" +
@@ -884,7 +940,6 @@ function drawKinPlot() {
   });
   if (!sel.length) metrics.innerHTML = '<div class="kin-row">select one or more joints above</div>';
 
-  // asymmetry
   const pair = el("kin-pair").value.split(",").map(Number);
   const L = kinPathLength(kinSeries(pair[0])), R = kinPathLength(kinSeries(pair[1]));
   const denom = L + R;
@@ -894,6 +949,7 @@ function drawKinPlot() {
 }
 
 function clearKinematics() {
+  invalidateKinCache();
   kinSelected.clear();
   kinSmooth = false;
   if (el("kin-smooth")) el("kin-smooth").checked = false;
@@ -908,6 +964,7 @@ function clearKinematics() {
 el("kin-smooth").addEventListener("change", (e) => {
   kinSmooth = e.target.checked;
   el("kin-smooth-note").hidden = !kinSmooth;
+  invalidateKinCache(); // smoothing changes the series
   drawKinPlot();
 });
 el("kin-pair").addEventListener("change", drawKinPlot);
@@ -920,9 +977,10 @@ el("video-input").addEventListener("change", (ev) => {
     cancelVideo();
     clearRenderState();
     el("video-name").textContent = file.name;
-    setStatus("File too large (" + (file.size / 1048576).toFixed(0) + " MB). Limit is 100 MB.", "error");
+    setStatus("File too large (" + (file.size / 1048576).toFixed(0) + " MB). Limit is " + Math.round(VIDEO_MAX_BYTES / 1048576) + " MB.", "error");
     return;
   }
+  clearVideoDirty();
   processVideoFile(file);
 });
 
@@ -955,6 +1013,9 @@ function resetWorkspace() {
   clearTimeout(rerunTimer);
   teardownCamera();
   cancelVideo();
+  videoProcessing = false;
+  setProcessingUI(false);
+  clearVideoDirty();
   clearRenderState();
   lastImage = null;
   lastVideoFile = null;
@@ -1013,16 +1074,15 @@ el("variant").addEventListener("click", async (ev) => {
   updateVariantUI();
   dirty = true;
   if (mode === "image") { const ok = await ensureLandmarker(); if (ok && lastImage) detectImage(); }
-  else if (mode === "video" && lastVideoFile) processVideoFile(lastVideoFile);
+  else if (mode === "video") markVideoDirty(); // reprocess is expensive - wait for Update
 });
 
+// Auto-rerun is only for IMAGE mode (cheap). Video mode uses markVideoDirty +
+// Update; webcam applies on the next frame.
 let rerunTimer = null;
 function scheduleRerun() {
   clearTimeout(rerunTimer);
-  rerunTimer = setTimeout(() => {
-    if (mode === "image" && lastImage) detectImage();
-    else if (mode === "video" && lastVideoFile) processVideoFile(lastVideoFile);
-  }, 250);
+  rerunTimer = setTimeout(() => { if (mode === "image" && lastImage) detectImage(); }, 250);
 }
 
 el("numposes").addEventListener("click", (ev) => {
@@ -1031,7 +1091,7 @@ el("numposes").addEventListener("click", (ev) => {
   settings.numPoses = Math.max(1, Math.min(4, settings.numPoses + Number(btn.dataset.step)));
   el("numposes-val").textContent = String(settings.numPoses);
   dirty = true;
-  scheduleRerun();
+  if (mode === "video") markVideoDirty(); else scheduleRerun();
 });
 
 function bindSlider(id, valId, key) {
@@ -1040,7 +1100,7 @@ function bindSlider(id, valId, key) {
     settings[key] = Number(slider.value);
     out.textContent = settings[key].toFixed(2);
     dirty = true;
-    scheduleRerun();
+    if (mode === "video") markVideoDirty(); else scheduleRerun();
   });
 }
 bindSlider("det", "det-val", "minDetection");
@@ -1168,7 +1228,11 @@ el("filter-all").addEventListener("change", (ev) => {
 function applyNow() {
   dirty = true;
   if (mode === "image" && lastImage) detectImage();
-  else if (mode === "video" && lastVideoFile) processVideoFile(lastVideoFile);
+  else if (mode === "video" && lastVideoFile) {
+    if (videoProcessing) return; // one reprocess at a time; ignore while running
+    clearVideoDirty();
+    processVideoFile(lastVideoFile);
+  }
 }
 function resetSettings() {
   variantByMode.image = "full"; variantByMode.webcam = "full"; variantByMode.video = "full";
@@ -1192,11 +1256,25 @@ function resetSettings() {
 
   dirty = true;
   if (mode === "image" && lastImage) detectImage();
-  else if (mode === "video" && lastVideoFile) processVideoFile(lastVideoFile);
+  else if (mode === "video" && lastVideoFile) markVideoDirty(); // reprocess is expensive - wait for Update
   else composite();
 }
 el("apply-btn").addEventListener("click", applyNow);
 el("reset-btn").addEventListener("click", resetSettings);
+el("vid-cancel").addEventListener("click", cancelProcessing);
+
+// Cancel an in-progress reprocess: stop the loop, revoke the URL, clean state.
+function cancelProcessing() {
+  videoRunId++;                 // the running loop's myRun !== videoRunId -> it bails
+  if (videoURL) { URL.revokeObjectURL(videoURL); videoURL = null; }
+  vidfile.removeAttribute("src"); vidfile.load();
+  videoProcessing = false;
+  setProcessingUI(false);
+  clearRenderState();           // drop any partially-cached frames / replay / kinematics
+  markVideoDirty();             // a file is loaded but not processed - offer Update
+  setModelState("ready", "ready");
+  setStatus("Processing cancelled.", "ready");
+}
 
 window.addEventListener("pagehide", () => { teardownCamera(); cancelVideo(); });
 

@@ -263,6 +263,10 @@ input[type="range"]::-moz-range-thumb {
 }
 .btn.step:hover { color: var(--ink); border-color: var(--line-2); }
 
+/* disabled controls while a video is processing */
+.segmented button:disabled, .stepper button:disabled,
+input[type="range"]:disabled { opacity: 0.45; cursor: not-allowed; }
+
 /* selectors + inline rows */
 .row-inline { display: flex; align-items: center; gap: 8px; }
 .select {
