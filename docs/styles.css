@@ -238,15 +238,49 @@ input[type="range"]::-moz-range-thumb {
 /* video replay controls */
 .replay { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .replay-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
-.btn.rp { padding: 5px 10px; font-size: 12px; }
+.btn.rp { padding: 5px 12px; font-size: 12px; }
 .replay-row .check.small { margin-left: auto; }
 #rp-scrub { width: 100%; }
+.timeline { accent-color: var(--accent); cursor: pointer; height: 18px; }
 .replay-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--ink-dim);
   margin-top: 6px;
 }
+#rp-time { color: var(--ink); font-weight: 600; }
+.rp-steps { margin-left: auto; display: flex; gap: 4px; }
+/* frame-stepping is secondary - keep it but de-emphasize */
+.btn.step {
+  padding: 3px 7px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+}
+.btn.step:hover { color: var(--ink); border-color: var(--line-2); }
+
+/* selectors + inline rows */
+.row-inline { display: flex; align-items: center; gap: 8px; }
+.select {
+  font: inherit; font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 2px;
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+/* kinematics */
+.kin canvas { width: 100%; height: auto; background: var(--panel-2); border: 1px solid var(--line); border-radius: 2px; }
+.kin-joints { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
+.kin-metrics { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); margin: 8px 0; }
+.kin-metrics .kin-row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.kin-metrics .kin-sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+.kin-asym-val { font-family: var(--mono); font-weight: 600; color: var(--ink); }
 
 /* settings action buttons */
 .actions { display: flex; gap: 8px; }

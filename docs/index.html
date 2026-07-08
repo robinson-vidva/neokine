@@ -47,24 +47,94 @@
               <span class="file-btn">Choose video</span>
               <span class="file-name" id="video-name">no file</span>
             </label>
+
+            <div class="field">
+              <div class="field-label">Duration cap</div>
+              <div class="segmented" id="vid-duration" role="radiogroup" aria-label="Duration cap">
+                <button type="button" data-sec="10" role="radio" aria-checked="true">10s</button>
+                <button type="button" data-sec="15" role="radio" aria-checked="false">15s</button>
+                <button type="button" data-sec="30" role="radio" aria-checked="false">30s</button>
+              </div>
+            </div>
+            <div class="field">
+              <div class="field-label">Sampling rate</div>
+              <div class="segmented" id="vid-fps" role="radiogroup" aria-label="Sampling rate">
+                <button type="button" data-fps="10" role="radio" aria-checked="true">10 fps</button>
+                <button type="button" data-fps="15" role="radio" aria-checked="false">15 fps</button>
+                <button type="button" data-fps="30" role="radio" aria-checked="false">30 fps</button>
+              </div>
+            </div>
+            <p class="note dim" id="vid-frames-note">about 100 frames</p>
+            <p class="note dim warn" id="vid-heavy-note" hidden>This will take a while to process.</p>
+
             <p class="note">
-              Processes the first 10 seconds only, sampled at about 10 frames
-              per second. Frames are processed in memory and discarded; the
-              processed video is not saved. Because frames are sampled, this is
-              a visualization, not a measurement.
+              Processes the first <span id="vid-dur-txt">10</span> seconds only,
+              sampled at the selected rate. Frames are processed in memory and
+              discarded; the processed video is not saved. Because frames are
+              sampled, this is a visualization, not a measurement.
             </p>
 
             <div class="replay" id="replay" hidden>
               <div class="replay-row">
                 <button type="button" class="btn rp" id="rp-play">Play</button>
-                <button type="button" class="btn rp" id="rp-back" title="Step back">Prev</button>
-                <button type="button" class="btn rp" id="rp-fwd" title="Step forward">Next</button>
-                <label class="check small"><input type="checkbox" id="rp-loop" /><span>Loop</span></label>
+                <label class="check small"><input type="checkbox" id="rp-loop" checked /><span>Loop</span></label>
               </div>
-              <input type="range" id="rp-scrub" min="0" max="0" step="1" value="0" />
-              <div class="replay-meta" id="rp-counter">frame 0 / 0</div>
-              <p class="note dim">Sampled playback (~10 fps), not real-time. These are the sampled frames, not the source video.</p>
+              <input type="range" id="rp-scrub" class="timeline" min="0" max="0" step="1" value="0" aria-label="Timeline" />
+              <div class="replay-meta">
+                <span id="rp-time">0.0s / 0.0s</span>
+                <span id="rp-counter">frame 0 / 0</span>
+                <span class="rp-steps">
+                  <button type="button" class="btn step" id="rp-back" title="Previous frame">Prev</button>
+                  <button type="button" class="btn step" id="rp-fwd" title="Next frame">Next</button>
+                </span>
+              </div>
+              <p class="note dim" id="rp-notice">Sampled playback (~10 fps), not real-time. These are the sampled frames, not the source video.</p>
             </div>
+
+            <details class="kin group" id="kin" hidden>
+              <summary class="group-head">Kinematics (selected joints)</summary>
+              <p class="note dim">
+                Values are in NORMALIZED image units per second, not physical
+                units. There is no camera calibration, depth, or scale reference,
+                so these cannot be converted to cm/s. Frames are sampled, so fast
+                motion may alias. Camera motion is indistinguishable from subject
+                motion. Distal joints (wrists, ankles, hips) carry the largest
+                positional error, so their velocity is the least reliable -
+                relative comparisons within one clip are more meaningful than
+                absolute values. This is a visualization POC, not a measurement;
+                the Python CLI is the source of truth.
+              </p>
+              <div class="field">
+                <div class="field-label">Track joints / regions</div>
+                <div id="kin-joints" class="kin-joints"></div>
+              </div>
+              <label class="check small"><input type="checkbox" id="kin-smooth" /><span>Smooth (3-frame average) before velocity</span></label>
+              <p class="note dim" id="kin-smooth-note" hidden>Smoothing changes the velocity estimate.</p>
+              <div class="field">
+                <div class="field-label">Trajectory: x (solid) and y (dashed) over time</div>
+                <canvas id="kin-plot" width="264" height="150"></canvas>
+              </div>
+              <div id="kin-metrics" class="kin-metrics"></div>
+              <div class="field" id="kin-asym-wrap">
+                <div class="field-label">Left-right asymmetry</div>
+                <div class="row-inline">
+                  <select id="kin-pair" class="select">
+                    <option value="15,16">wrists</option>
+                    <option value="13,14">elbows</option>
+                    <option value="11,12">shoulders</option>
+                    <option value="23,24">hips</option>
+                    <option value="25,26">knees</option>
+                    <option value="27,28">ankles</option>
+                  </select>
+                  <span id="kin-asym" class="kin-asym-val">-</span>
+                </div>
+                <p class="note dim">
+                  Asymmetry index = (L - R) / (L + R), range -1..1, from total
+                  displacement of the chosen pair. 0 = symmetric; positive = left
+                  side moved more, negative = right.
+                </p>
+              </div>
+            </details>
           </div>
 
           <div class="mode-panel" data-for="webcam" hidden>

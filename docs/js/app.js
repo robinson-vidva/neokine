@@ -28,9 +28,12 @@ const tooltip = el("tooltip");
 const variantByMode = { image: "full", webcam: "full", video: "full" };
 const settings = { numPoses: 1, minDetection: 0.5, minPresence: 0.5 };
 
-const VIDEO_CAP = 10.0;
-const VIDEO_STEP = 0.1;
-const VIDEO_MAX_FRAMES = 100;
+// Sampling knobs (user-selectable). Duration cap in seconds and sampling rate
+// in fps; total frames hard-capped regardless of selection.
+let videoDurationSec = 10;   // 10 / 15 / 30
+let videoFps = 10;           // 10 / 15 / 30
+const VIDEO_MAX_FRAMES = 900;      // hard cap (900 seeks ~ 20-60s)
+const VIDEO_HEAVY_FRAMES = 300;    // warn above this
 // Backstop against a file so large the initial load hangs. Raised from 100MB:
 // a <10s 4K clip can exceed 100MB while being perfectly valid, and creating the
 // object URL does not decode the whole file (only metadata + sampled seeks), so
@@ -60,6 +63,7 @@ let lastPts0 = null; // canvas-space points of pose 0, for hit-testing
 let lastLms0 = null; // raw normalized landmarks of pose 0, for off-frame checks
 let view = null;     // { a, e, f } transform: canvas = a*intrinsic + (e,f)
 let fitA = 1;        // the "fit to canvas" scale (zoom baseline)
+let viewFitDims = null; // dims the current view was fit for; refit when they change
 const frameCanvas = document.createElement("canvas");
 const fctx = frameCanvas.getContext("2d");
 
@@ -137,9 +141,19 @@ function fitView() {
   const a = Math.min(cw / scene.iw, ch / scene.ih);
   fitA = a;
   view = { a, e: M + (cw - scene.iw * a) / 2, f: M + (ch - scene.ih * a) / 2 };
+  viewFitDims = { iw: scene.iw, ih: scene.ih, cw: canvas.width, ch: canvas.height };
 }
 
-function ensureFit() { if (!view) fitView(); }
+// Refit when there is no view yet, or when the ACTUAL drawn image's dimensions
+// change (e.g. processing uses the source video, replay uses the smaller cached
+// bitmap) or the canvas is resized. Otherwise keep the view so zoom/pan persists.
+function ensureFit() {
+  if (!view || !viewFitDims ||
+      viewFitDims.iw !== scene.iw || viewFitDims.ih !== scene.ih ||
+      viewFitDims.cw !== canvas.width || viewFitDims.ch !== canvas.height) {
+    fitView();
+  }
+}
 
 function toCanvasPt(nx, ny) {
   const x = scene.mirror ? 1 - nx : nx;
@@ -561,7 +575,7 @@ let lastVideoFile = null;
 let videoFrames = [];   // [{ t, result, blob, w, h }]
 let replayIdx = 0;
 let replayPlaying = false;
-let replayLoop = false;
+let replayLoop = true;   // loop ON by default
 let replayTimer = null;
 let replayBitmap = null; // currently decoded frame (closed when replaced)
 let replayToken = 0;     // guards out-of-order async decodes during scrubbing
@@ -608,10 +622,13 @@ async function processVideoFile(file) {
   if (myRun !== videoRunId) return;
 
   setModelState("running", "running");
+  const cap = videoDurationSec;               // seconds
+  const step = 1 / videoFps;                   // seconds between samples
+  const maxFrames = Math.min(VIDEO_MAX_FRAMES, Math.ceil(cap * videoFps) + 1);
   let count = 0;
   let endedEarly = false;
   let t = 0;
-  while (t < VIDEO_CAP && count < VIDEO_MAX_FRAMES) {
+  while (t < cap && count < maxFrames) {
     if (myRun !== videoRunId) return;
     await seekTo(t);
     if (myRun !== videoRunId) return;
@@ -627,38 +644,40 @@ async function processVideoFile(file) {
       poseCount.textContent = "poses: " + frameResult.landmarks.length;
     } catch (e) { /* skip a bad frame */ }
     if (frameResult) {
-      const cap = await frameToBlob(vidfile, vidfile.videoWidth, vidfile.videoHeight);
-      videoFrames.push({ t: actual, result: frameResult, blob: cap.blob, w: cap.w, h: cap.h });
+      const capd = await frameToBlob(vidfile, vidfile.videoWidth, vidfile.videoHeight);
+      videoFrames.push({ t: actual, result: frameResult, blob: capd.blob, w: capd.w, h: capd.h });
     }
     count++;
-    const pct = Math.min(100, Math.round((t / VIDEO_CAP) * 100));
-    setStatus("Processing video... " + actual.toFixed(1) + "s (" + pct + "%)");
+    const pct = Math.min(100, Math.round((t / cap) * 100));
+    setStatus("Processing video... " + actual.toFixed(1) + "s (" + pct + "%, " + count + " frames)");
     await new Promise((r) => setTimeout(r, 0));
-    t = Math.round((t + VIDEO_STEP) * 1000) / 1000;
+    t = Math.round((t + step) * 1000) / 1000;
   }
   if (myRun !== videoRunId) return;
 
   let longer = false;
   if (!endedEarly) {
-    if (isFinite(vidfile.duration) && vidfile.duration > VIDEO_CAP + 0.05) longer = true;
+    if (isFinite(vidfile.duration) && vidfile.duration > cap + 0.05) longer = true;
     else {
-      await seekTo(VIDEO_CAP + 0.3);
+      await seekTo(cap + 0.3);
       if (myRun !== videoRunId) return;
-      if (vidfile.currentTime > VIDEO_CAP + 0.05) longer = true;
+      if (vidfile.currentTime > cap + 0.05) longer = true;
     }
   }
-  notice.textContent = longer ? "Showing first 10 seconds" : "";
+  notice.textContent = longer ? ("Showing first " + cap + " seconds") : "";
 
   // Frames are cached as blobs; the video element/URL is no longer needed for
   // replay (approach 2). Free it now; resetWorkspace revokes again as a no-op.
   if (videoURL) { URL.revokeObjectURL(videoURL); videoURL = null; }
   vidfile.removeAttribute("src");
   vidfile.load();
-  if (videoFrames.length) { replayIdx = videoFrames.length - 1; await showReplayFrame(replayIdx); }
+  el("rp-notice").textContent = "Sampled playback (~" + videoFps + " fps), not real-time. These are the sampled frames, not the source video.";
+  if (videoFrames.length) { replayIdx = videoFrames.length - 1; buildKinJoints(); await showReplayFrame(replayIdx); }
   updateReplayUI();
+  el("kin").hidden = videoFrames.length === 0;
 
   setModelState("ready", "ready");
-  setStatus("Processed " + (longer ? "first 10 seconds" : "video") + " (" + count + " frames sampled).", "ready");
+  setStatus("Processed " + (longer ? "first " + cap + " seconds" : "video") + " (" + count + " frames at " + videoFps + " fps).", "ready");
 }
 
 // --- replay (sampled playback of the cached frames) ---
@@ -687,6 +706,7 @@ async function showReplayFrame(k) {
   stage.classList.add("has-image");
   poseCount.textContent = "poses: " + fr.result.landmarks.length;
   updateReplayUI();
+  drawKinPlot(); // moves the current-frame cursor on the trajectory plot
 }
 
 function pauseReplay() {
@@ -725,8 +745,10 @@ function updateReplayUI() {
   sc.max = String(Math.max(0, M - 1));
   sc.value = String(replayIdx);
   el("rp-loop").checked = replayLoop;
-  const t = M ? videoFrames[replayIdx].t : 0;
-  el("rp-counter").textContent = M ? "frame " + (replayIdx + 1) + " / " + M + "  @ " + t.toFixed(2) + "s" : "frame 0 / 0";
+  const cur = M ? videoFrames[replayIdx].t : 0;
+  const total = M ? videoFrames[M - 1].t : 0;
+  el("rp-time").textContent = cur.toFixed(1) + "s / " + total.toFixed(1) + "s";
+  el("rp-counter").textContent = M ? "frame " + (replayIdx + 1) + " / " + M : "frame 0 / 0";
 }
 
 function stopReplay() {
@@ -738,7 +760,9 @@ function stopReplay() {
   el("replay").hidden = true;
   el("rp-scrub").value = "0"; el("rp-scrub").max = "0";
   el("rp-counter").textContent = "frame 0 / 0";
+  el("rp-time").textContent = "0.0s / 0.0s";
   el("rp-play").textContent = "Play";
+  clearKinematics();
 }
 
 el("rp-play").addEventListener("click", () => { replayPlaying ? pauseReplay() : playReplay(); });
@@ -746,6 +770,147 @@ el("rp-back").addEventListener("click", () => { pauseReplay(); showReplayFrame(r
 el("rp-fwd").addEventListener("click", () => { pauseReplay(); showReplayFrame(replayIdx + 1); });
 el("rp-loop").addEventListener("change", (e) => { replayLoop = e.target.checked; });
 el("rp-scrub").addEventListener("input", (e) => { const k = Number(e.target.value); pauseReplay(); showReplayFrame(k); });
+
+// --- sampling knobs (duration + fps) ---
+
+function updateFrameCountNote() {
+  const est = Math.min(VIDEO_MAX_FRAMES, Math.ceil(videoDurationSec * videoFps));
+  el("vid-frames-note").textContent = "about " + est + " frames (hard cap " + VIDEO_MAX_FRAMES + ")";
+  el("vid-heavy-note").hidden = est <= VIDEO_HEAVY_FRAMES;
+  el("vid-dur-txt").textContent = String(videoDurationSec);
+}
+el("vid-duration").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-sec]"); if (!b) return;
+  videoDurationSec = Number(b.dataset.sec);
+  for (const x of el("vid-duration").querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
+  updateFrameCountNote();
+});
+el("vid-fps").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-fps]"); if (!b) return;
+  videoFps = Number(b.dataset.fps);
+  for (const x of el("vid-fps").querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
+  updateFrameCountNote();
+});
+
+// --- kinematics (Part D): computed from the cached per-frame landmarks ---
+
+const KIN_JOINTS = [
+  [0, "nose"], [11, "left shoulder"], [12, "right shoulder"], [13, "left elbow"],
+  [14, "right elbow"], [15, "left wrist"], [16, "right wrist"], [23, "left hip"],
+  [24, "right hip"], [25, "left knee"], [26, "right knee"], [27, "left ankle"], [28, "right ankle"],
+];
+const KIN_COLORS = ["#2f6df6", "#e8590c", "#0ca678", "#ae3ec9", "#f08c00", "#e64980", "#1098ad", "#5c940d"];
+let kinSelected = new Set([15, 16]); // default: both wrists
+let kinSmooth = false;
+
+function buildKinJoints() {
+  const host = el("kin-joints");
+  host.innerHTML = "";
+  if (kinSelected.size === 0) kinSelected = new Set([15, 16]);
+  for (const [idx, label] of KIN_JOINTS) {
+    const l = document.createElement("label");
+    l.className = "check small";
+    const c = document.createElement("input");
+    c.type = "checkbox"; c.checked = kinSelected.has(idx);
+    c.addEventListener("change", () => { c.checked ? kinSelected.add(idx) : kinSelected.delete(idx); drawKinPlot(); });
+    l.appendChild(c);
+    const s = document.createElement("span"); s.textContent = label; l.appendChild(s);
+    host.appendChild(l);
+  }
+}
+
+function smoothInPlace(a) {
+  const b = a.slice();
+  for (let i = 0; i < a.length; i++) {
+    const lo = Math.max(0, i - 1), hi = Math.min(a.length - 1, i + 1);
+    let s = 0, n = 0; for (let j = lo; j <= hi; j++) { s += b[j]; n++; }
+    a[i] = s / n;
+  }
+}
+// Normalized-image-unit series for one joint across the sampled frames.
+function kinSeries(idx) {
+  const t = [], x = [], y = [];
+  for (const fr of videoFrames) {
+    const lm = fr.result.landmarks[0] && fr.result.landmarks[0][idx];
+    if (!lm) continue;
+    t.push(fr.t); x.push(lm.x); y.push(lm.y);
+  }
+  if (kinSmooth) { smoothInPlace(x); smoothInPlace(y); }
+  return { t, x, y };
+}
+function kinPathLength(s) {
+  let d = 0;
+  for (let i = 1; i < s.x.length; i++) d += Math.hypot(s.x[i] - s.x[i - 1], s.y[i] - s.y[i - 1]);
+  return d;
+}
+function kinMeanVel(s) {
+  const dt = s.t.length > 1 ? s.t[s.t.length - 1] - s.t[0] : 0;
+  return dt > 0 ? kinPathLength(s) / dt : 0;
+}
+
+function drawKinPlot() {
+  if (el("kin").hidden || !videoFrames.length) return;
+  const cv = el("kin-plot"), c = cv.getContext("2d");
+  c.clearRect(0, 0, cv.width, cv.height);
+  const sel = [...kinSelected];
+  const total = videoFrames[videoFrames.length - 1].t || 1;
+  const t0 = videoFrames[0].t;
+  const span = Math.max(1e-6, total - t0);
+  const X = (t) => 4 + ((t - t0) / span) * (cv.width - 8);
+  const Y = (v) => 4 + (1 - Math.max(0, Math.min(1, v))) * (cv.height - 8);
+
+  // current-frame cursor
+  c.strokeStyle = "rgba(0,0,0,0.25)"; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(X(videoFrames[replayIdx].t), 0); c.lineTo(X(videoFrames[replayIdx].t), cv.height); c.stroke();
+
+  const metrics = el("kin-metrics");
+  metrics.innerHTML = "";
+  sel.forEach((idx, k) => {
+    const color = KIN_COLORS[k % KIN_COLORS.length];
+    const s = kinSeries(idx);
+    if (s.x.length < 2) return;
+    // x(t) solid
+    c.strokeStyle = color; c.lineWidth = 1.5; c.setLineDash([]);
+    c.beginPath(); for (let i = 0; i < s.x.length; i++) { const px = X(s.t[i]), py = Y(s.x[i]); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
+    // y(t) dashed
+    c.setLineDash([3, 3]);
+    c.beginPath(); for (let i = 0; i < s.y.length; i++) { const px = X(s.t[i]), py = Y(s.y[i]); i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
+    c.setLineDash([]);
+    const name = (KIN_JOINTS.find((j) => j[0] === idx) || [0, "?"])[1];
+    const row = document.createElement("div"); row.className = "kin-row";
+    row.innerHTML = '<span><span class="kin-sw" style="background:' + color + '"></span>' + name + "</span>" +
+      "<span>disp " + kinPathLength(s).toFixed(3) + " | vel " + kinMeanVel(s).toFixed(3) + "/s</span>";
+    metrics.appendChild(row);
+  });
+  if (!sel.length) metrics.innerHTML = '<div class="kin-row">select one or more joints above</div>';
+
+  // asymmetry
+  const pair = el("kin-pair").value.split(",").map(Number);
+  const L = kinPathLength(kinSeries(pair[0])), R = kinPathLength(kinSeries(pair[1]));
+  const denom = L + R;
+  const ai = denom > 0 ? (L - R) / denom : 0;
+  const side = Math.abs(ai) < 0.02 ? "symmetric" : (ai > 0 ? "left moved more" : "right moved more");
+  el("kin-asym").textContent = denom > 0 ? ai.toFixed(2) + " (" + side + ")" : "-";
+}
+
+function clearKinematics() {
+  kinSelected.clear();
+  kinSmooth = false;
+  if (el("kin-smooth")) el("kin-smooth").checked = false;
+  if (el("kin-smooth-note")) el("kin-smooth-note").hidden = true;
+  if (el("kin-joints")) el("kin-joints").innerHTML = "";
+  if (el("kin-metrics")) el("kin-metrics").innerHTML = "";
+  if (el("kin-asym")) el("kin-asym").textContent = "-";
+  const kp = el("kin-plot"); if (kp) kp.getContext("2d").clearRect(0, 0, kp.width, kp.height);
+  const k = el("kin"); if (k) { k.hidden = true; k.open = false; }
+}
+
+el("kin-smooth").addEventListener("change", (e) => {
+  kinSmooth = e.target.checked;
+  el("kin-smooth-note").hidden = !kinSmooth;
+  drawKinPlot();
+});
+el("kin-pair").addEventListener("change", drawKinPlot);
 
 el("video-input").addEventListener("change", (ev) => {
   const file = ev.target.files && ev.target.files[0];
@@ -774,6 +939,7 @@ function clearRenderState() {
   lastPts0 = null;
   lastLms0 = null;
   view = null;
+  viewFitDims = null;
   pins.clear();
   hoverIndex = -1;
   panning = false; pointer = null;
@@ -1042,5 +1208,6 @@ sizeCanvas();
 buildFilters();
 updateVariantUI();
 updateInteractiveUI();
+updateFrameCountNote();
 setStatus("Loading pose model...");
 ensureLandmarker().then((ok) => { if (ok) setStatus("Pose model ready. Choose an image.", "ready"); });
