@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>neokine - neonatal pose visualization (demo)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-mode="image">
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark">neokine</span>
+        <span class="sub">neonatal pose visualization / demo</span>
+      </div>
+      <div class="model-state" id="model-state" data-state="loading">
+        <span class="dot"></span><span class="label" id="model-state-label">loading model</span>
+      </div>
+    </header>
+
+    <div class="scopebar">
+      Visualization only. Runs pose estimation in your browser to draw skeletons.
+      Not a measurement or diagnostic tool; no clinical claims. Nothing is uploaded or stored.
+    </div>
+
+    <div class="workspace">
+      <aside class="rail">
+        <section class="group">
+          <div class="group-head">Input</div>
+          <div class="modes">
+            <button class="mode-btn is-active" type="button" data-mode="image">Upload image</button>
+            <button class="mode-btn" type="button" data-mode="webcam">Live webcam</button>
+            <button class="mode-btn" type="button" data-mode="video">Upload video</button>
+          </div>
+
+          <div class="mode-panel" data-for="image">
+            <label class="file">
+              <input type="file" id="image-input" accept="image/*" />
+              <span class="file-btn" id="file-btn">Choose image</span>
+              <span class="file-name" id="file-name">no file</span>
+            </label>
+          </div>
+
+          <div class="mode-panel" data-for="video" hidden>
+            <label class="file">
+              <input type="file" id="video-input" accept="video/*" />
+              <span class="file-btn">Choose video</span>
+              <span class="file-name" id="video-name">no file</span>
+            </label>
+            <p class="note">
+              Processes the first 10 seconds only, sampled at about 10 frames
+              per second. Frames are processed in memory and discarded; the
+              processed video is not saved. Because frames are sampled, this is
+              a visualization, not a measurement.
+            </p>
+
+            <div class="replay" id="replay" hidden>
+              <div class="replay-row">
+                <button type="button" class="btn rp" id="rp-play">Play</button>
+                <button type="button" class="btn rp" id="rp-back" title="Step back">Prev</button>
+                <button type="button" class="btn rp" id="rp-fwd" title="Step forward">Next</button>
+                <label class="check small"><input type="checkbox" id="rp-loop" /><span>Loop</span></label>
+              </div>
+              <input type="range" id="rp-scrub" min="0" max="0" step="1" value="0" />
+              <div class="replay-meta" id="rp-counter">frame 0 / 0</div>
+              <p class="note dim">Sampled playback (~10 fps), not real-time. These are the sampled frames, not the source video.</p>
+            </div>
+          </div>
+
+          <div class="mode-panel" data-for="webcam" hidden>
+            <div class="cam-controls">
+              <button type="button" class="btn primary" id="cam-start">Start camera</button>
+              <button type="button" class="btn" id="cam-stop" disabled>Stop</button>
+            </div>
+            <p class="note">
+              Live webcam is a general demo. There is no live infant feed - it
+              runs pose on whatever your camera sees. Frames are processed in
+              memory and discarded; nothing is recorded.
+            </p>
+          </div>
+        </section>
+
+        <section class="group">
+          <div class="group-head">Model</div>
+          <div class="field">
+            <div class="field-label">Variant</div>
+            <div class="segmented" id="variant" role="radiogroup" aria-label="Model variant">
+              <button type="button" data-variant="lite" role="radio" aria-checked="false">lite</button>
+              <button type="button" data-variant="full" role="radio" aria-checked="true">full</button>
+              <button type="button" data-variant="heavy" role="radio" aria-checked="false">heavy</button>
+            </div>
+            <p class="note dim warn" id="variant-note" hidden>
+              heavy may reduce frame rate on webcam.
+            </p>
+          </div>
+          <div class="field">
+            <div class="field-label">numPoses</div>
+            <div class="stepper" id="numposes">
+              <button type="button" data-step="-1" aria-label="decrease">-</button>
+              <output id="numposes-val">1</output>
+              <button type="button" data-step="1" aria-label="increase">+</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <div class="group-head">Overlay</div>
+          <div class="field">
+            <div class="field-label">Point labels</div>
+            <div class="radios" id="labelmode">
+              <label class="radio"><input type="radio" name="labelmode" value="hover" checked /><span>On hover / selected</span></label>
+              <label class="radio"><input type="radio" name="labelmode" value="always" /><span>Always show</span></label>
+            </div>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><i style="background:#12b886"></i>Left limbs</span>
+            <span class="legend-item"><i style="background:#f59f00"></i>Right limbs</span>
+            <span class="legend-item"><i style="background:#4c6ef5"></i>Torso</span>
+            <span class="legend-item"><i style="background:#adb5bd"></i>Face</span>
+          </div>
+          <p class="note dim">
+            Points follow the MediaPipe 33-landmark body model. Labels mark the
+            main joints; pinned joints stay labeled in either mode.
+          </p>
+        </section>
+
+        <details class="group advanced">
+          <summary class="group-head">Advanced options</summary>
+          <p class="note">
+            These change what the demo shows, not measured accuracy. Lower
+            confidence is not better. The Python CLI remains the source of truth
+            for accuracy.
+          </p>
+          <div class="field">
+            <div class="field-label">
+              minPoseDetectionConfidence <output id="det-val">0.50</output>
+            </div>
+            <input type="range" id="det" min="0" max="1" step="0.05" value="0.5" />
+          </div>
+          <div class="field">
+            <div class="field-label">
+              minPosePresenceConfidence <output id="pres-val">0.50</output>
+            </div>
+            <input type="range" id="pres" min="0" max="1" step="0.05" value="0.5" />
+          </div>
+          <p class="note dim" id="apply-note">Applied automatically to the current input.</p>
+
+          <div class="subhead">Points shown (display filter)</div>
+          <p class="note dim">
+            Hides points on the overlay only. The model still outputs all 33
+            landmarks - this does not change detection or speed anything up.
+          </p>
+          <label class="check master"><input type="checkbox" id="filter-all" /><span>Show all / hide all</span></label>
+          <div id="filters"></div>
+
+          <label class="check" style="margin-top:12px"><input type="checkbox" id="hide-oof" checked /><span>Hide out-of-frame points</span></label>
+          <p class="note dim">
+            When a joint is outside the frame, MediaPipe still outputs an
+            estimated position - a guess for a point it cannot see, not an
+            observation. Hidden by default.
+          </p>
+
+          <div class="subhead">Canvas interactions</div>
+          <div id="interactions">
+            <label class="check"><input type="checkbox" id="int-hover" checked /><span>Hover tooltip (name + coords)</span></label>
+            <label class="check"><input type="checkbox" id="int-vis" checked /><span>Show visibility in tooltip</span></label>
+            <label class="check"><input type="checkbox" id="int-pin" checked /><span>Click to pin/highlight a joint</span></label>
+            <label class="check"><input type="checkbox" id="int-zoom" checked /><span>Zoom &amp; pan</span></label>
+          </div>
+          <p class="note dim warn" id="webcam-interact-note" hidden>
+            Interactions apply to images and the processed video frame, not live
+            webcam.
+          </p>
+        </details>
+
+        <div class="group actions">
+          <button type="button" class="btn primary" id="apply-btn">Update</button>
+          <button type="button" class="btn" id="reset-btn">Reset</button>
+        </div>
+      </aside>
+
+      <main class="stage" id="stage">
+        <canvas id="output"></canvas>
+        <video id="cam" playsinline muted hidden></video>
+        <video id="vidfile" playsinline muted preload="auto" hidden></video>
+        <div class="placeholder" id="placeholder">
+          <span id="placeholder-text">Choose an image to run pose</span>
+        </div>
+        <button type="button" class="stage-btn" id="resetview" hidden>Reset view</button>
+        <div class="tooltip" id="tooltip" hidden></div>
+      </main>
+    </div>
+
+    <footer class="statusbar">
+      <span class="status-item" id="status">Loading pose model...</span>
+      <span class="status-item ro" id="pose-count">poses: --</span>
+      <span class="status-item ro grow" id="notice"></span>
+      <span class="status-item ro">MediaPipe Tasks Vision / client-side</span>
+    </footer>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

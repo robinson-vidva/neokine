@@ -1,0 +1,13 @@
+dataset/
+outputs/
+*.zip
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+.DS_Store
+
+# temporary test/probe assets created during development
+web/_*
+_probe*
