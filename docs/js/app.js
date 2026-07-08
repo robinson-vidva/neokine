@@ -700,7 +700,9 @@ async function processVideoFile(file) {
     if (frameResult) {
       const capd = await frameToBlob(vidfile, vidfile.videoWidth, vidfile.videoHeight);
       if (myRun !== videoRunId) return; // cancelled during encode: do not push or overwrite status
-      videoFrames.push({ t: actual, result: frameResult, blob: capd.blob, w: capd.w, h: capd.h });
+      // toBlob can return null under memory pressure; a null blob would later
+      // reject in showReplayFrame and wedge finalization, so skip that frame.
+      if (capd.blob) videoFrames.push({ t: actual, result: frameResult, blob: capd.blob, w: capd.w, h: capd.h });
     }
     count++;
     const pct = Math.min(100, Math.round((t / cap) * 100));
@@ -731,7 +733,9 @@ async function processVideoFile(file) {
     replayIdx = videoFrames.length - 1;
     showKinPanel(true);   // show the panel FIRST so buildKinJoints -> rebuildKinPlots
     buildKinJoints();     // can build/render the plots (it no-ops while hidden)
-    await showReplayFrame(replayIdx);
+    // A frame that fails to decode must NOT leave finalization stuck in the
+    // "processing" state (Cancel stuck, status frozen at 99%). Release regardless.
+    try { await showReplayFrame(replayIdx); } catch (e) { /* last frame left blank */ }
   } else {
     showKinPanel(false);
   }
