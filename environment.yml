@@ -1,0 +1,23 @@
+# Conda environment for the local Streamlit app (app/).
+# The web app in docs/ needs NO install - it runs entirely in the browser.
+#
+#   conda env create -f environment.yml
+#   conda activate neokine
+#   streamlit run app/streamlit_app.py
+#
+# Python is pinned to 3.12 because mediapipe 0.10.14 has no wheels for 3.13+.
+name: neokine
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - streamlit>=1.40
+      - mediapipe==0.10.14
+      - opencv-python>=4.10
+      - plotly>=5.24
+      - pillow>=10
+      - scipy>=1.13
+      - streamlit-webrtc>=0.47   # optional: live webcam; falls back to snapshot if unavailable
+      - av>=12                    # optional: required by streamlit-webrtc
