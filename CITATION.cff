@@ -5,8 +5,7 @@ message: >-
   metadata from this file.
 type: software
 authors:
-  - given-names: Robinson
-    family-names: Vidva
+  - name: "The neokine authors"
 repository-code: "https://github.com/robinson-vidva/neokine"
 url: "https://robinson-vidva.github.io/neokine/"
 abstract: >-
