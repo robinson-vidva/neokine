@@ -200,12 +200,14 @@
           <span id="placeholder-text">Choose an image to run pose</span>
         </div>
         <button type="button" class="stage-btn" id="resetview" hidden>Reset view</button>
+        <button type="button" class="stage-btn stage-btn-tr" id="export-png" hidden title="Download the overlay as a PNG">Save PNG</button>
         <div class="tooltip" id="tooltip" hidden></div>
       </main>
 
       <aside class="kinpanel" id="kinpanel" hidden>
         <div class="kinpanel-head">
           <span class="kinpanel-title">Kinematics</span>
+          <button type="button" class="kinpanel-toggle" id="export-csv" title="Download the sampled per-frame landmarks as CSV" hidden>Save CSV</button>
           <button type="button" class="kinpanel-toggle" id="kin-toggle" title="Collapse / expand">Collapse</button>
         </div>
         <div class="kinpanel-body" id="kinpanel-body">

@@ -452,6 +452,32 @@ video { display: none; }
   cursor: pointer;
 }
 .stage-btn:hover { border-color: var(--accent); }
+/* Save PNG sits top-right; nudge Reset view left of it so they never overlap
+   (both can be visible at once in zoomed image/video views). */
+.stage-btn-tr { top: 12px; right: 12px; }
+#resetview { right: 92px; }
+
+/* drag & drop affordance */
+.stage.dragover {
+  outline: 2px dashed var(--accent);
+  outline-offset: -10px;
+}
+.stage.dragover::after {
+  content: "Drop image or video";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(18,184,134,0.06);
+  pointer-events: none;
+}
 
 .tooltip {
   position: absolute;

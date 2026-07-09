@@ -39,6 +39,11 @@ python3 -m http.server 8000 --directory docs
 
 Requires a modern browser and an internet connection (for the CDN assets).
 
+You can **drag-and-drop** an image or video straight onto the stage, **Save
+PNG** to download the current overlay, and (in video mode) **Save CSV** to
+export the sampled per-frame landmarks (normalized image units — a
+visualization export, not a calibrated measurement).
+
 ---
 
 ## 2. Streamlit app — `app/` (local Python)

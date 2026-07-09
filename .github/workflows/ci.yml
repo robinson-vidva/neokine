@@ -1,0 +1,40 @@
+name: CI
+
+# Lightweight checks for both front-ends. No project dependencies are installed:
+# the web app (docs/) is dependency-free, and we only syntax-check the Streamlit
+# app (app/) rather than importing MediaPipe.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web app (docs/) — JS syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Syntax-check JavaScript
+        run: |
+          for f in docs/js/*.js; do
+            echo "checking $f"
+            node --check "$f"
+          done
+
+  python:
+    name: Streamlit app (app/) — compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Byte-compile Python sources
+        run: python -m compileall -q app shared

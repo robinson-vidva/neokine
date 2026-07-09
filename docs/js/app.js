@@ -262,6 +262,7 @@ function placeLabels(indices, pts, bounds, jointIdx) {
 function composite() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height); // clear the full backing store (device px)
+  updateExportUI();
   if (!scene) return;
   ensureFit();
   // One transform maps CSS px -> device px, so every draw below stays in CSS px
@@ -462,7 +463,66 @@ function updateInteractiveUI() {
   el("webcam-interact-note").hidden = canInteract;
   el("resetview").hidden = !(interactive() && interactions.zoom);
   canvas.style.cursor = interactive() && interactions.zoom ? "grab" : "default";
+  updateExportUI();
 }
+
+// --- export (overlay PNG + kinematics CSV) ---
+
+// The PNG mirrors whatever is currently composited (image, webcam, or the
+// selected replay frame). The CSV is the sampled per-frame landmarks behind the
+// kinematics panel - a visualization export, not a calibrated measurement.
+function updateExportUI() {
+  const pngBtn = el("export-png");
+  if (pngBtn) pngBtn.hidden = !scene;
+  const csvBtn = el("export-csv");
+  if (csvBtn) csvBtn.hidden = !(mode === "video" && videoFrames.length > 0);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function exportPNG() {
+  if (!scene) { setStatus("Nothing to export yet.", "error"); return; }
+  canvas.toBlob((blob) => {
+    if (!blob) { setStatus("Could not export the overlay image.", "error"); return; }
+    downloadBlob(blob, "neokine-overlay.png");
+    setStatus("Saved overlay PNG.", "ready");
+  }, "image/png");
+}
+
+function exportCSV() {
+  if (mode !== "video" || !videoFrames.length) {
+    setStatus("Kinematics CSV is available after processing a video.", "error");
+    return;
+  }
+  const header = ["frame", "t_seconds"];
+  for (const name of LANDMARK_NAMES) header.push(name + "_x", name + "_y", name + "_visibility");
+  const rows = [header.join(",")];
+  videoFrames.forEach((fr, k) => {
+    const lm = fr.result.landmarks[0];
+    const cells = [k, fr.t.toFixed(4)];
+    for (let i = 0; i < LANDMARK_NAMES.length; i++) {
+      const p = lm && lm[i];
+      if (p) cells.push(p.x.toFixed(6), p.y.toFixed(6), p.visibility != null ? p.visibility.toFixed(4) : "");
+      else cells.push("", "", "");
+    }
+    rows.push(cells.join(","));
+  });
+  const blob = new Blob([rows.join("\n") + "\n"], { type: "text/csv;charset=utf-8" });
+  downloadBlob(blob, "neokine-kinematics.csv");
+  setStatus("Saved kinematics CSV (" + videoFrames.length + " frames, normalized image units).", "ready");
+}
+
+el("export-png").addEventListener("click", exportPNG);
+el("export-csv").addEventListener("click", exportCSV);
 
 // --- image mode ---
 
@@ -501,10 +561,7 @@ async function detectImage() {
   }
 }
 
-el("image-input").addEventListener("change", async (ev) => {
-  const file = ev.target.files && ev.target.files[0];
-  ev.target.value = "";
-  if (!file) return;
+async function handleImageFile(file) {
   clearRenderState();
   lastImage = null;
   el("file-name").textContent = file.name;
@@ -515,6 +572,13 @@ el("image-input").addEventListener("change", async (ev) => {
   } catch (e) {
     setStatus("Failed to read image. " + e, "error");
   }
+}
+
+el("image-input").addEventListener("change", (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = "";
+  if (!file) return;
+  handleImageFile(file);
 });
 
 // --- webcam mode ---
@@ -1193,10 +1257,7 @@ if (window.ResizeObserver) {
   kinResizeObs.observe(el("kinpanel-body"));
 }
 
-el("video-input").addEventListener("change", (ev) => {
-  const file = ev.target.files && ev.target.files[0];
-  ev.target.value = "";
-  if (!file) return;
+function handleVideoFile(file) {
   if (file.size > VIDEO_MAX_BYTES) {
     cancelVideo();
     clearRenderState();
@@ -1206,6 +1267,13 @@ el("video-input").addEventListener("change", (ev) => {
   }
   clearVideoDirty();
   processVideoFile(file);
+}
+
+el("video-input").addEventListener("change", (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = "";
+  if (!file) return;
+  handleVideoFile(file);
 });
 
 // --- teardown / reset ---
@@ -1288,6 +1356,41 @@ function switchMode(next) {
 for (const b of document.querySelectorAll(".mode-btn[data-mode]")) {
   b.addEventListener("click", () => { if (!b.disabled) switchMode(b.dataset.mode); });
 }
+
+// --- drag & drop onto the stage ---
+// Dropping an image or a video loads it through the same path as the file
+// pickers, auto-switching to the matching mode. preventDefault on dragover is
+// what tells the browser this is a drop target (otherwise it navigates).
+for (const evName of ["dragenter", "dragover"]) {
+  stage.addEventListener(evName, (e) => {
+    if (!e.dataTransfer || Array.from(e.dataTransfer.types || []).indexOf("Files") === -1) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    stage.classList.add("dragover");
+  });
+}
+for (const evName of ["dragleave", "dragend"]) {
+  stage.addEventListener(evName, (e) => {
+    // Ignore dragleave that just crossed into a child element still inside the stage.
+    if (evName === "dragleave" && e.relatedTarget && stage.contains(e.relatedTarget)) return;
+    stage.classList.remove("dragover");
+  });
+}
+stage.addEventListener("drop", (e) => {
+  e.preventDefault();
+  stage.classList.remove("dragover");
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!file) return;
+  if (file.type.startsWith("image/")) {
+    if (mode !== "image") switchMode("image");
+    handleImageFile(file);
+  } else if (file.type.startsWith("video/")) {
+    if (mode !== "video") switchMode("video");
+    handleVideoFile(file);
+  } else {
+    setStatus("Unsupported file. Drop an image or a video.", "error");
+  }
+});
 
 // --- model + settings controls ---
 
