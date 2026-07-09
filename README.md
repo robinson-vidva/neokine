@@ -112,3 +112,21 @@ requirements-app.txt  pip setup for the Streamlit app
 
 The Python analysis/evaluation code (SyRIP dataset) lives in a separate
 `syrip-analysis` project; this repo is just the two visualization front-ends.
+
+---
+
+## License & attribution
+
+neokine is licensed under the [Apache License 2.0](LICENSE). See [`NOTICE`](NOTICE)
+for third-party components (MediaPipe, Streamlit, OpenCV, Plotly, and others),
+which are loaded from a CDN or installed from PyPI and remain under their own
+licenses.
+
+> **Not a medical device.** neokine is a visualization demo only. Its outputs are
+> estimates in normalized image units with no calibration, depth, or scale
+> reference. It is **not** a measurement or diagnostic tool and makes no clinical
+> claims. It is provided "as is", without warranty of any kind (see the LICENSE).
+
+To cite this project, use the metadata in [`CITATION.cff`](CITATION.cff) (GitHub
+shows a "Cite this repository" button). Contributions are welcome — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md).

@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: "neokine — Neonatal Kinematics"
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Robinson
+    family-names: Vidva
+repository-code: "https://github.com/robinson-vidva/neokine"
+url: "https://robinson-vidva.github.io/neokine/"
+abstract: >-
+  A pose-visualization demo for infant movement. It runs MediaPipe Pose to draw
+  a skeleton over an image, video, or webcam feed and to plot simple kinematics
+  (displacement, velocity, and a left–right asymmetry index) over time. It is a
+  visualization tool only — the outputs are estimates in normalized image units
+  with no calibration, and it makes no clinical or diagnostic claims.
+keywords:
+  - pose-estimation
+  - mediapipe
+  - kinematics
+  - infant-movement
+  - visualization
+  - streamlit
+license: Apache-2.0
