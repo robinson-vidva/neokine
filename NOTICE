@@ -1,0 +1,41 @@
+neokine — Neonatal Kinematics
+Copyright 2026 The neokine authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+------------------------------------------------------------------------------
+Third-party components
+------------------------------------------------------------------------------
+
+neokine does not vendor the libraries below; they are installed from PyPI (the
+Streamlit app) or loaded at runtime from a CDN (the web app). Each remains under
+its own license, reproduced/available at the URLs indicated. This notice is
+provided for attribution and convenience.
+
+MediaPipe (and the Pose Landmarker task models)
+  Copyright Google LLC
+  Apache License 2.0 — https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE
+  Web app loads the WASM runtime and model from Google's CDN; the Streamlit app
+  downloads the .task model files once from Google's CDN into app/models/.
+
+Streamlit
+  Copyright Snowflake Inc.
+  Apache License 2.0 — https://github.com/streamlit/streamlit/blob/develop/LICENSE
+
+OpenCV (opencv-python)
+  Apache License 2.0 — https://github.com/opencv/opencv/blob/4.x/LICENSE
+
+Plotly (plotly.py)
+  MIT License — https://github.com/plotly/plotly.py/blob/master/LICENSE.txt
+
+Pillow
+  MIT-CMU License — https://github.com/python-pillow/Pillow/blob/main/LICENSE
+
+SciPy
+  BSD 3-Clause License — https://github.com/scipy/scipy/blob/main/LICENSE.txt
+
+streamlit-webrtc
+  MIT License — https://github.com/whitphx/streamlit-webrtc/blob/main/LICENSE
+
+PyAV (av)
+  BSD 3-Clause License — https://github.com/PyAV-Org/PyAV/blob/main/LICENSE.txt
