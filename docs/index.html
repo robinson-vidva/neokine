@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=4" />
+  <link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -167,7 +167,7 @@
         </section>
 
         <details class="group advanced" open>
-          <summary class="group-head">Advanced options <button type="button" class="info" aria-label="About advanced options" aria-expanded="false" data-info="These change what the demo shows, not measured accuracy. Lower confidence is not better. The Python CLI remains the source of truth for accuracy.">i</button></summary>
+          <summary class="group-head">Advanced options <button type="button" class="info" aria-label="About advanced options" aria-expanded="false" data-info="These change what the demo shows, not how accurate the pose is. Lower thresholds are not better - they just let weaker guesses through. Treat everything here as a visual estimate, not a measurement.">i</button></summary>
           <div class="field">
             <div class="field-label">
               Detection threshold
@@ -237,7 +237,7 @@
         <div class="kinpanel-body" id="kinpanel-body">
           <p class="note kin-caveat">
             Visualization only - normalized image units, sampled, not a measurement.
-            <button type="button" class="info" aria-label="Kinematics caveats in full" aria-expanded="false" data-info="Values are in normalized image units per second, not physical units. There is no camera calibration, depth, or scale reference, so these cannot be converted to cm/s. Frames are sampled, so fast motion may alias. Camera motion is indistinguishable from subject motion. Distal joints (wrists, ankles, hips) carry the largest positional error, so their velocity is the least reliable; relative comparisons within one clip are more meaningful than absolute values. This is a visualization POC, not a measurement; the Python CLI is the source of truth.">i</button>
+            <button type="button" class="info" aria-label="Kinematics caveats in full" aria-expanded="false" data-info="Values are in normalized image units per second (a fraction of the frame), not physical units. There is no camera calibration, depth, or scale reference, so these cannot be converted to cm/s. Frames are sampled, so fast motion may look jumpy or be missed. Camera movement looks the same as the subject moving. The joints that move most (wrists, ankles, feet) also carry the largest positional error, so their velocity is the least reliable; comparing within one clip is more meaningful than absolute numbers. This is a visualization, not a validated measurement.">i</button>
           </p>
           <div class="field">
             <div class="field-label">Track joints / regions</div>
@@ -250,7 +250,7 @@
               Trajectory: x (colored) and y (gray) over time
               <label class="check small kin-zoom-lbl"><input type="checkbox" id="kin-zoom" /><span>Zoom</span></label>
             </div>
-            <p class="note dim">Binning affects the display only - the displacement, velocity, and asymmetry values are unchanged.</p>
+            <p class="note dim">How the plot is drawn affects the display only - the displacement, velocity, and asymmetry values are unchanged.</p>
             <div id="kin-plots" class="kin-plots-list"></div>
           </div>
           <div id="kin-metrics" class="kin-metrics"></div>
@@ -287,6 +287,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=4" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=5" data-cfasync="false"></script>
 </body>
 </html>

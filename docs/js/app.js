@@ -1379,7 +1379,7 @@ const PLACEHOLDER = {
 const MODE_STATUS = {
   image: "Image mode. Choose an image.",
   webcam: "Webcam mode. Start the camera.",
-  video: "Video mode. Upload a video (first 10 seconds are processed).",
+  video: "Video mode. Upload a video (only the first few seconds are processed).",
 };
 
 function switchMode(next) {
