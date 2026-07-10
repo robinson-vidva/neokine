@@ -1276,6 +1276,28 @@ el("video-input").addEventListener("change", (ev) => {
   handleVideoFile(file);
 });
 
+// Bundled demo clip: fetched from docs/samples/ and fed through the exact same
+// path as an uploaded file (nothing is uploaded). It is AI-generated footage of
+// a synthetic person - see docs/samples/README.md.
+async function loadSampleVideo() {
+  const btn = el("sample-video");
+  btn.disabled = true;
+  setStatus("Loading sample clip...");
+  try {
+    const res = await fetch("samples/synthetic-walk.mp4");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    const file = new File([blob], "synthetic-walk.mp4", { type: blob.type || "video/mp4" });
+    if (mode !== "video") switchMode("video");
+    handleVideoFile(file);
+  } catch (e) {
+    setStatus("Could not load the sample clip. " + e, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+el("sample-video").addEventListener("click", loadSampleVideo);
+
 // --- teardown / reset ---
 
 function clearCanvas() { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); }
