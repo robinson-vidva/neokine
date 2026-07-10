@@ -317,24 +317,38 @@ function composite() {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  // Motion trails (video only): the path each tracked joint has taken from the
-  // start of the clip up to the frame on screen, in that joint's plot color.
-  // Drawn under the skeleton so the current pose stays crisp on top.
+  // Motion trails (video only): a fading "comet tail" of each tracked joint's
+  // recent path, in that joint's plot color. Older segments fade out and thin,
+  // the current position is a bright dot - so direction and recency read at a
+  // glance instead of a flat tangled loop. Drawn under the skeleton.
   if (mode === "video" && showTrails && videoFrames.length && kinSelected.size) {
+    const TAIL = 32; // how many recent frames the tail spans
+    ctx.lineCap = "round";
     for (const idx of kinSelected) {
-      ctx.strokeStyle = kinColor(idx);
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.7;
-      ctx.beginPath();
-      let started = false;
-      for (let k = 0; k <= replayIdx && k < videoFrames.length; k++) {
+      const col = kinColor(idx);
+      const first = Math.max(0, replayIdx - TAIL);
+      let prev = null;
+      for (let k = first; k <= replayIdx && k < videoFrames.length; k++) {
         const lm = videoFrames[k].result.landmarks[0];
         const p = lm && lm[idx];
-        if (!p) { started = false; continue; }
-        const c = toCanvasPt(p.x, p.y);
-        if (started) ctx.lineTo(c.x, c.y); else { ctx.moveTo(c.x, c.y); started = true; }
+        const c = p ? toCanvasPt(p.x, p.y) : null;
+        if (c && prev) {
+          const recency = (k - first) / Math.max(1, replayIdx - first); // 0 old .. 1 now
+          ctx.globalAlpha = 0.08 + 0.72 * recency;
+          ctx.lineWidth = 1 + 2.4 * recency;
+          ctx.strokeStyle = col;
+          ctx.beginPath(); ctx.moveTo(prev.x, prev.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+        }
+        prev = c || prev;
       }
-      ctx.stroke();
+      // bright head at the current position
+      const lmNow = videoFrames[replayIdx] && videoFrames[replayIdx].result.landmarks[0];
+      const pNow = lmNow && lmNow[idx];
+      if (pNow) {
+        const c = toCanvasPt(pNow.x, pNow.y);
+        ctx.globalAlpha = 0.95; ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(c.x, c.y, 3.5, 0, 6.2832); ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -702,24 +716,52 @@ el("sample-image").addEventListener("click", loadSampleImage);
 
 // --- webcam mode ---
 
+let selectedCameraId = null; // chosen video input (front/back/etc.)
+
 async function startCamera() {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
-    });
+    const video_c = { width: { ideal: 1280 }, height: { ideal: 720 } };
+    if (selectedCameraId) video_c.deviceId = { exact: selectedCameraId };
+    else video_c.facingMode = { ideal: "user" }; // default to the selfie camera on phones
+    stream = await navigator.mediaDevices.getUserMedia({ video: video_c, audio: false });
   } catch (e) {
     setStatus("Camera unavailable or permission denied. " + e, "error");
     return;
   }
   video.srcObject = stream;
-  await video.play();
+  try { await video.play(); } catch (e) { /* autoplay quirk; the tick loop still reads frames */ }
   if (!(await ensureLandmarker())) { stopCamera(); return; }
   streaming = true;
   el("cam-start").disabled = true;
   el("cam-stop").disabled = false;
   setModelState("running", "running");
   setStatus("Webcam running.", "ready");
+  populateCameraList(); // now that permission is granted, labels are available
   tick();
+}
+
+// List available cameras and show the picker (only once there is a choice to
+// make). Device labels are only exposed after camera permission is granted, so
+// this runs after a successful start.
+async function populateCameraList() {
+  const sel = el("cam-select");
+  if (!sel || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  try {
+    const cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "videoinput");
+    const track = stream && stream.getVideoTracks && stream.getVideoTracks()[0];
+    const curId = track && track.getSettings ? track.getSettings().deviceId : null;
+    if (curId) selectedCameraId = curId;
+    if (cams.length < 2) { sel.hidden = true; return; } // nothing to choose between
+    sel.innerHTML = "";
+    cams.forEach((c, i) => {
+      const opt = document.createElement("option");
+      opt.value = c.deviceId;
+      opt.textContent = c.label || "Camera " + (i + 1);
+      if (c.deviceId === selectedCameraId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.hidden = false;
+  } catch (e) { /* enumeration failed - just skip the picker */ }
 }
 
 function teardownCamera() {
@@ -763,6 +805,10 @@ async function tick() {
 
 el("cam-start").addEventListener("click", startCamera);
 el("cam-stop").addEventListener("click", stopCamera);
+el("cam-select").addEventListener("change", async (e) => {
+  selectedCameraId = e.target.value;
+  if (streaming) { teardownCamera(); await startCamera(); } // switch live
+});
 
 // --- video mode (sampled, first 10 seconds) ---
 

@@ -312,6 +312,7 @@ input[type="range"]:disabled { opacity: 0.45; cursor: not-allowed; }
   background: var(--panel-2);
   color: var(--ink);
 }
+.cam-select { width: 100%; margin-bottom: 10px; padding: 7px 8px; }
 
 /* kinematics */
 /* kinematics right-side panel */
