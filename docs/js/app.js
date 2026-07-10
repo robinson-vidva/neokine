@@ -90,6 +90,10 @@ function offFrame(l) { return l.x < 0 || l.x > 1 || l.y < 0 || l.y > 1; }
 function setModelState(state, label) {
   modelState.dataset.state = state;
   modelStateLabel.textContent = label;
+  // Spinner on the stage while the model loads/runs, but only when there is
+  // nothing rendered yet (the CSS gates on :not(.has-image)) - never over a
+  // live webcam feed or a visible result.
+  stage.classList.toggle("busy", state !== "ready");
 }
 function setStatus(text, kind) {
   statusEl.textContent = text;
@@ -1519,6 +1523,7 @@ el("variant").addEventListener("click", async (ev) => {
   if (!btn || btn.dataset.variant === variantByMode[mode]) return;
   variantByMode[mode] = btn.dataset.variant;
   updateVariantUI();
+  saveSettings();
   dirty = true;
   if (mode === "image") { const ok = await ensureLandmarker(); if (ok && lastImage) detectImage(); }
   else if (mode === "video") markVideoDirty(); // reprocess is expensive - wait for Update
@@ -1537,6 +1542,7 @@ el("numposes").addEventListener("click", (ev) => {
   if (!btn) return;
   settings.numPoses = Math.max(1, Math.min(4, settings.numPoses + Number(btn.dataset.step)));
   el("numposes-val").textContent = String(settings.numPoses);
+  saveSettings();
   dirty = true;
   if (mode === "video") markVideoDirty(); else scheduleRerun();
 });
@@ -1546,6 +1552,7 @@ function bindSlider(id, valId, key) {
   slider.addEventListener("input", () => {
     settings[key] = Number(slider.value);
     out.textContent = settings[key].toFixed(2);
+    saveSettings();
     dirty = true;
     if (mode === "video") markVideoDirty(); else scheduleRerun();
   });
@@ -1555,7 +1562,7 @@ bindSlider("pres", "pres-val", "minPresence");
 
 // label mode
 for (const r of document.querySelectorAll('input[name="labelmode"]')) {
-  r.addEventListener("change", () => { if (r.checked) { labelMode = r.value; composite(); } });
+  r.addEventListener("change", () => { if (r.checked) { labelMode = r.value; saveSettings(); composite(); } });
 }
 
 // interaction toggles
@@ -1563,6 +1570,7 @@ function bindInteraction(id, key) {
   el(id).addEventListener("change", (ev) => {
     interactions[key] = ev.target.checked;
     if (!interactions.hover) hideTooltip();
+    saveSettings();
     updateInteractiveUI();
     composite();
   });
@@ -1575,6 +1583,7 @@ bindInteraction("int-zoom", "zoom");
 el("hide-oof").addEventListener("change", (ev) => {
   hideOOF = ev.target.checked;
   if (hoverIndex >= 0 && lastLms0 && hideOOF && offFrame(lastLms0[hoverIndex])) { hoverIndex = -1; hideTooltip(); }
+  saveSettings();
   composite();
 });
 
@@ -1700,6 +1709,7 @@ function resetSettings() {
   buildFilters();
   updateVariantUI();
   updateInteractiveUI();
+  saveSettings(); // persist the restored defaults
 
   dirty = true;
   if (mode === "image" && lastImage) detectImage();
@@ -1822,7 +1832,70 @@ el("brand-reset").addEventListener("click", (e) => { e.preventDefault(); resetAp
   const kb = document.getElementById("kinpanel-body"); if (kb) kb.addEventListener("scroll", reflow);
 })();
 
+// --- settings persistence (localStorage) ---
+// Remembers the common controls across visits: model size, thresholds, number
+// of people, label mode, canvas interactions, and the out-of-frame toggle. The
+// per-joint display filter is intentionally not persisted (it resets to sane
+// defaults each visit). Fails silently where storage is unavailable.
+const LS_KEY = "neokine.settings";
+function saveSettings() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      variant: variantByMode.image,
+      numPoses: settings.numPoses,
+      minDetection: settings.minDetection,
+      minPresence: settings.minPresence,
+      labelMode,
+      interactions: { ...interactions },
+      hideOOF,
+    }));
+  } catch (e) { /* storage blocked (private mode / disabled) - ignore */ }
+}
+function loadSettings() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) { s = null; }
+  if (!s || typeof s !== "object") return;
+  if (s.variant === "lite" || s.variant === "full" || s.variant === "heavy") {
+    variantByMode.image = variantByMode.webcam = variantByMode.video = s.variant;
+  }
+  if (Number.isFinite(s.numPoses)) settings.numPoses = Math.max(1, Math.min(4, s.numPoses));
+  if (Number.isFinite(s.minDetection)) settings.minDetection = Math.max(0, Math.min(1, s.minDetection));
+  if (Number.isFinite(s.minPresence)) settings.minPresence = Math.max(0, Math.min(1, s.minPresence));
+  if (s.labelMode === "hover" || s.labelMode === "always") labelMode = s.labelMode;
+  if (s.interactions) for (const k of ["hover", "visibility", "pin", "zoom"]) {
+    if (typeof s.interactions[k] === "boolean") interactions[k] = s.interactions[k];
+  }
+  if (typeof s.hideOOF === "boolean") hideOOF = s.hideOOF;
+}
+// Push the current settings globals into their controls (init + reset).
+function applySettingsToUI() {
+  el("numposes-val").textContent = String(settings.numPoses);
+  el("det").value = String(settings.minDetection); el("det-val").textContent = settings.minDetection.toFixed(2);
+  el("pres").value = String(settings.minPresence); el("pres-val").textContent = settings.minPresence.toFixed(2);
+  const lm = document.querySelector('input[name="labelmode"][value="' + labelMode + '"]');
+  if (lm) lm.checked = true;
+  el("int-hover").checked = interactions.hover;
+  el("int-vis").checked = interactions.visibility;
+  el("int-pin").checked = interactions.pin;
+  el("int-zoom").checked = interactions.zoom;
+  el("hide-oof").checked = hideOOF;
+}
+
+// --- keyboard shortcuts (video playback) ---
+// Space toggles play/pause; Left/Right step frames. Ignored while typing in a
+// control so it never hijacks normal interaction.
+document.addEventListener("keydown", (e) => {
+  if (mode !== "video" || !videoFrames.length) return;
+  const t = e.target;
+  if (t && (t.matches("input, select, textarea, button") || t.isContentEditable)) return;
+  if (e.key === " " || e.key === "Spacebar") { e.preventDefault(); replayPlaying ? pauseReplay() : playReplay(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); pauseReplay(); showReplayFrame(replayIdx - 1); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); pauseReplay(); showReplayFrame(replayIdx + 1); }
+});
+
 // initial load
+loadSettings();
+applySettingsToUI();
 sizeCanvas();
 buildFilters();
 updateVariantUI();
