@@ -71,6 +71,8 @@ const pins = new Set();
 let hoverIndex = -1;
 let pointer = null;   // active drag {x,y,e,f}
 let panning = false;
+const activePointers = new Map(); // pointerId -> {x,y} client coords (touch pinch)
+let pinch = null;     // { dist0, a0, imgX, imgY } during a 2-finger gesture
 
 // display filter + overlay + interaction state
 const groupOn = {};
@@ -452,14 +454,49 @@ function showTooltip(i, ev) {
 }
 function hideTooltip() { tooltip.hidden = true; }
 
+// --- touch pinch-to-zoom helpers (two fingers) ---
+function clientToCanvas(cx, cy) {
+  const r = canvas.getBoundingClientRect();
+  return { x: cx - r.left, y: cy - r.top };
+}
+function pointerMid() {
+  const p = [...activePointers.values()];
+  return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+}
+function pointerDist() {
+  const p = [...activePointers.values()];
+  return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1;
+}
+// Anchor the image point currently under the finger-midpoint; it will stay under
+// the midpoint as the fingers spread/pinch/drag (natural zoom + pan together).
+function startPinch() {
+  const mc = clientToCanvas(...Object.values(pointerMid()));
+  pinch = { dist0: pointerDist(), a0: view.a, imgX: (mc.x - view.e) / view.a, imgY: (mc.y - view.f) / view.a };
+}
+
 canvas.addEventListener("pointerdown", (ev) => {
   if (!interactive()) return;
-  pointer = { x: ev.clientX, y: ev.clientY, e: view.e, f: view.f };
-  panning = false;
+  activePointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
   canvas.setPointerCapture(ev.pointerId);
+  if (activePointers.size === 2 && interactions.zoom) {
+    startPinch(); pointer = null; panning = false; hideTooltip();
+  } else if (activePointers.size === 1) {
+    pointer = { x: ev.clientX, y: ev.clientY, e: view.e, f: view.f };
+    panning = false;
+  }
 });
 canvas.addEventListener("pointermove", (ev) => {
   if (!interactive()) return;
+  if (activePointers.has(ev.pointerId)) activePointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pinch && activePointers.size >= 2) {
+    const na = Math.min(fitA * 12, Math.max(fitA * 0.8, pinch.a0 * (pointerDist() / pinch.dist0)));
+    const mc = clientToCanvas(...Object.values(pointerMid()));
+    view.a = na;
+    view.e = mc.x - pinch.imgX * na;
+    view.f = mc.y - pinch.imgY * na;
+    hideTooltip(); composite(); updateInteractiveUI();
+    return;
+  }
   if (pointer && interactions.zoom) {
     // Pan in CSS px (client-px delta == CSS-px delta); no dpr factor.
     const dx = ev.clientX - pointer.x;
@@ -473,15 +510,29 @@ canvas.addEventListener("pointermove", (ev) => {
     if (i >= 0) showTooltip(i, ev); else hideTooltip();
   }
 });
-canvas.addEventListener("pointerup", (ev) => {
-  if (interactive() && pointer && !panning && interactions.pin) {
+function releasePointer(ev, allowTap) {
+  const wasPinching = !!pinch;
+  activePointers.delete(ev.pointerId);
+  if (activePointers.size < 2) pinch = null;
+  if (wasPinching) {
+    // one finger still down after a pinch: resume panning from it (no jump)
+    if (activePointers.size === 1) {
+      const rem = [...activePointers.values()][0];
+      pointer = { x: rem.x, y: rem.y, e: view.e, f: view.f };
+    } else { pointer = null; }
+    panning = false;
+    return;
+  }
+  if (allowTap && interactive() && pointer && !panning && interactions.pin) {
     const i = hitTest(ev);
     if (i >= 0) { pins.has(i) ? pins.delete(i) : pins.add(i); composite(); }
   }
-  pointer = null; panning = false;
-});
+  if (activePointers.size === 0) { pointer = null; panning = false; }
+}
+canvas.addEventListener("pointerup", (ev) => releasePointer(ev, true));
+canvas.addEventListener("pointercancel", (ev) => releasePointer(ev, false));
 canvas.addEventListener("pointerleave", () => {
-  if (pointer) return;
+  if (pointer || activePointers.size) return;
   hoverIndex = -1; hideTooltip(); composite();
 });
 canvas.addEventListener("wheel", (ev) => {
