@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -289,6 +289,11 @@
       <span class="status-item" id="status">Loading pose model...</span>
       <span class="status-item ro" id="pose-count">poses: --</span>
       <span class="status-item ro grow" id="notice"></span>
+      <span class="status-item ro links">
+        <a href="https://github.com/robinson-vidva/neokine/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/robinson-vidva/neokine/blob/main/TERMS.md" target="_blank" rel="noopener">Terms</a>
+      </span>
       <span class="status-item ro">MediaPipe Tasks Vision / client-side</span>
     </footer>
   </div>
@@ -296,6 +301,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=8" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=9" data-cfasync="false"></script>
 </body>
 </html>

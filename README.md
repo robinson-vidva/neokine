@@ -27,8 +27,9 @@ A static site (HTML/CSS/JS). MediaPipe's library, WASM runtime, and the pose
 model are fetched from a CDN at runtime, so there are no dependencies to
 install.
 
-**Hosted:** published via GitHub Pages from `docs/` →
-`https://robinson-vidva.github.io/neokine/` (if Pages is enabled for the repo).
+**Hosted:** published via GitHub Pages from `docs/`, served at
+`https://robinsonvidva.com/neokine/` (custom domain, via Cloudflare) and
+`https://robinson-vidva.github.io/neokine/`.
 
 **Run locally** (ES modules require `http://`, not opening the file directly):
 
@@ -39,13 +40,25 @@ python3 -m http.server 8000 --directory docs
 
 Requires a modern browser and an internet connection (for the CDN assets).
 
-You can **drag-and-drop** an image or video straight onto the stage, **Save
-PNG** to download the current overlay, and (in video mode) **Save CSV** to
-export the sampled per-frame landmarks (normalized image units — a
-visualization export, not a calibrated measurement). Video mode also offers a
-one-click **sample clip** (`docs/samples/`) — AI-generated footage of a
-synthetic person (not real, not an infant) so you can try it without your own
-file.
+### Web app features
+
+- **Inputs:** upload an image or video, or use the live webcam;
+  **drag-and-drop** onto the stage; or one-click **sample image / clip**
+  (`docs/samples/`) — AI-generated synthetic people (not real, not infants) so
+  you can try it with no file of your own.
+- **Overlay:** region-colored skeleton, per-joint/per-group display filters,
+  hover tooltips, click-to-pin, zoom/pan, and **motion trails** (a tracked
+  joint's path across the video frames).
+- **Kinematics** (video): per-joint displacement, mean velocity, the left–right
+  asymmetry index `(L − R)/(L + R)`, and **joint angles** (elbow/knee/hip, with
+  range of motion). All in normalized image units — a visualization, not a
+  calibrated measurement.
+- **Export:** **Save PNG** (the overlay) and **Save CSV** (per-frame landmarks +
+  joint angles).
+- **Quality of life:** remembers your settings across visits (localStorage),
+  **dark mode** (follows your OS), video keyboard shortcuts (Space = play/pause,
+  ←/→ = step frames), keyboard-navigable controls, and a retry button if the
+  model fails to load.
 
 ---
 
@@ -123,12 +136,17 @@ The Python analysis/evaluation code (SyRIP dataset) lives in a separate
 
 ---
 
-## License & attribution
+## License, privacy & terms
 
 neokine is licensed under the [Apache License 2.0](LICENSE). See [`NOTICE`](NOTICE)
 for third-party components (MediaPipe, Streamlit, OpenCV, Plotly, and others),
 which are loaded from a CDN or installed from PyPI and remain under their own
 licenses.
+
+- **[Privacy Policy](PRIVACY.md)** — your media is processed on your device and
+  never uploaded; no cookies, analytics, or tracking. Settings are stored
+  locally in your browser only.
+- **[Terms of Use](TERMS.md)** — the "as is", not-a-medical-device terms.
 
 > **Not a medical device.** neokine is a visualization demo only. Its outputs are
 > estimates in normalized image units with no calibration, depth, or scale

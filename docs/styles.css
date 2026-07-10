@@ -571,7 +571,8 @@ summary:focus-visible,
 .statusbar {
   display: flex;
   align-items: center;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 6px 18px;
   padding: 8px 16px;
   border-top: 1px solid var(--line);
   background: var(--panel);
@@ -584,6 +585,9 @@ summary:focus-visible,
 .status-item.grow { flex: 1; color: var(--accent); }
 #status.error { color: var(--danger); }
 #status.ready { color: var(--ok); }
+.status-item.links { display: inline-flex; gap: 6px; }
+.status-item.links a { color: var(--ink-faint); text-decoration: none; }
+.status-item.links a:hover { color: var(--accent); text-decoration: underline; }
 
 /* medium: kinematics panel stacks BELOW the canvas (never squeezes it) */
 @media (max-width: 1100px) {
