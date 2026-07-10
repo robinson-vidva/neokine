@@ -2130,4 +2130,21 @@ updateVariantUI();
 updateInteractiveUI();
 updateFrameCountNote();
 setStatus("Loading pose model...");
-ensureLandmarker().then((ok) => { if (ok) setStatus("Pose model ready. Choose an image.", "ready"); });
+
+// Dismiss the app splash once the model is ready (or failed - the app + retry
+// button are behind it either way). A safety timeout guarantees it never traps
+// the user if the model load hangs.
+let splashGone = false;
+function hideSplash() {
+  if (splashGone) return;
+  splashGone = true;
+  const s = document.getElementById("splash");
+  if (!s) return;
+  s.classList.add("hide");
+  setTimeout(() => s.remove(), 500);
+}
+ensureLandmarker().then((ok) => {
+  if (ok) setStatus("Pose model ready. Choose an image.", "ready");
+  hideSplash();
+});
+setTimeout(hideSplash, 12000); // fail-safe: never keep the splash up forever

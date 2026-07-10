@@ -35,6 +35,33 @@ body {
   grid-template-rows: auto auto 1fr auto;
 }
 
+/* App-style splash / loader shown while the pose model loads */
+.splash {
+  position: fixed; inset: 0; z-index: 3000;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+  transition: opacity 0.45s ease;
+}
+.splash.hide { opacity: 0; pointer-events: none; }
+.splash-inner { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.splash-logo {
+  border-radius: 20px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.25);
+  animation: splashPulse 1.7s ease-in-out infinite;
+}
+.splash-word { margin-top: 16px; font-weight: 700; font-size: 24px; letter-spacing: 0.01em; color: var(--ink); }
+.splash-sub { margin-top: 3px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-faint); }
+.splash-spinner {
+  width: 22px; height: 22px; margin-top: 22px;
+  border: 3px solid var(--line-2); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+.splash-status { margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
+@keyframes splashPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) {
+  .splash-logo, .splash-spinner { animation: none; }
+}
+
 /* top bar */
 .topbar {
   display: flex;
