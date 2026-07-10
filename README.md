@@ -5,6 +5,10 @@ Pose](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) to
 draw a skeleton over an image, video, or webcam feed and to plot simple
 kinematics (displacement, velocity, left–right asymmetry) over time.
 
+**Try it:** [robinsonvidva.com/neokine](https://robinsonvidva.com/neokine/)
+
+![neokine web app: a region-colored MediaPipe skeleton drawn over a full-body photo](docs/screenshot.png)
+
 > **Visualization only.** These are estimates in normalized image units — no
 > camera calibration, depth, or scale reference. This is **not** a measurement
 > or diagnostic tool and makes no clinical claims. Nothing is uploaded; all
