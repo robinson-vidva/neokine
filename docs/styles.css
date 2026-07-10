@@ -191,7 +191,7 @@ details.advanced[open] summary { margin-bottom: 12px; }
 }
 
 /* action buttons (camera) */
-.cam-controls { display: flex; gap: 8px; margin-bottom: 10px; }
+.cam-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .btn {
   font: inherit;
   font-size: 13px;

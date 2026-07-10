@@ -716,17 +716,25 @@ el("sample-image").addEventListener("click", loadSampleImage);
 
 // --- webcam mode ---
 
-let selectedCameraId = null; // chosen video input (front/back/etc.)
+let selectedCameraId = null;     // a specific chosen video input (picker)
+let cameraFacing = "user";       // 'user' (front/selfie) or 'environment' (back)
 
 async function startCamera() {
+  const base = { width: { ideal: 1280 }, height: { ideal: 720 } };
+  const video_c = { ...base };
+  if (selectedCameraId) video_c.deviceId = { exact: selectedCameraId };
+  else video_c.facingMode = { ideal: cameraFacing };
   try {
-    const video_c = { width: { ideal: 1280 }, height: { ideal: 720 } };
-    if (selectedCameraId) video_c.deviceId = { exact: selectedCameraId };
-    else video_c.facingMode = { ideal: "user" }; // default to the selfie camera on phones
     stream = await navigator.mediaDevices.getUserMedia({ video: video_c, audio: false });
   } catch (e) {
-    setStatus("Camera unavailable or permission denied. " + e, "error");
-    return;
+    // Requested camera (facing/device) may not exist - retry with no constraint.
+    if (video_c.deviceId || video_c.facingMode) {
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: base, audio: false }); }
+      catch (e2) { setStatus("Camera unavailable or permission denied. " + e2, "error"); return; }
+    } else {
+      setStatus("Camera unavailable or permission denied. " + e, "error");
+      return;
+    }
   }
   video.srcObject = stream;
   try { await video.play(); } catch (e) { /* autoplay quirk; the tick loop still reads frames */ }
@@ -734,6 +742,7 @@ async function startCamera() {
   streaming = true;
   el("cam-start").disabled = true;
   el("cam-stop").disabled = false;
+  el("cam-flip").disabled = false;
   setModelState("running", "running");
   setStatus("Webcam running.", "ready");
   populateCameraList(); // now that permission is granted, labels are available
@@ -771,6 +780,7 @@ function teardownCamera() {
   video.srcObject = null;
   el("cam-start").disabled = false;
   el("cam-stop").disabled = true;
+  el("cam-flip").disabled = true;
 }
 
 function stopCamera() {
@@ -808,6 +818,15 @@ el("cam-stop").addEventListener("click", stopCamera);
 el("cam-select").addEventListener("change", async (e) => {
   selectedCameraId = e.target.value;
   if (streaming) { teardownCamera(); await startCamera(); } // switch live
+});
+// Flip front <-> back. Uses facingMode (works on phones without relying on
+// device labels); clears any specific device pick so facingMode takes effect.
+el("cam-flip").addEventListener("click", async () => {
+  cameraFacing = cameraFacing === "user" ? "environment" : "user";
+  selectedCameraId = null;
+  if (!streaming) return;
+  teardownCamera();
+  await startCamera();
 });
 
 // --- video mode (sampled, first 10 seconds) ---

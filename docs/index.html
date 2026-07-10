@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -111,8 +111,9 @@
             <div class="cam-controls">
               <button type="button" class="btn primary" id="cam-start">Start camera</button>
               <button type="button" class="btn" id="cam-stop" disabled>Stop</button>
+              <button type="button" class="btn" id="cam-flip" disabled title="Switch between front and back camera">Flip camera</button>
             </div>
-            <select id="cam-select" class="select cam-select" aria-label="Choose camera" hidden></select>
+            <select id="cam-select" class="select cam-select" aria-label="Choose a specific camera" hidden></select>
             <p class="note">
               Live webcam is a general demo. There is no live infant feed - it
               runs pose on whatever your camera sees. Frames are processed in
@@ -395,6 +396,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=13" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=14" data-cfasync="false"></script>
 </body>
 </html>
