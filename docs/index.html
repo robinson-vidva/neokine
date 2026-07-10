@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -123,8 +123,11 @@
         <section class="group">
           <div class="group-head">Model</div>
           <div class="field">
-            <div class="field-label">Variant</div>
-            <div class="segmented" id="variant" role="radiogroup" aria-label="Model variant">
+            <div class="field-label">
+              Model size
+              <button type="button" class="info" aria-label="About the model size" aria-expanded="false" data-info="Trades speed for detail. lite is fastest; heavy is the most detailed but slowest (and may reduce the webcam frame rate). full is a good default.">i</button>
+            </div>
+            <div class="segmented" id="variant" role="radiogroup" aria-label="Model size">
               <button type="button" data-variant="lite" role="radio" aria-checked="false">lite</button>
               <button type="button" data-variant="full" role="radio" aria-checked="true">full</button>
               <button type="button" data-variant="heavy" role="radio" aria-checked="false">heavy</button>
@@ -134,11 +137,14 @@
             </p>
           </div>
           <div class="field">
-            <div class="field-label">numPoses</div>
+            <div class="field-label">
+              People to detect
+              <button type="button" class="info" aria-label="About the number of people" aria-expanded="false" data-info="How many people the model looks for in the frame (MediaPipe numPoses). Leave at 1 for a single subject; raise it only if more than one person should be tracked.">i</button>
+            </div>
             <div class="stepper" id="numposes">
-              <button type="button" data-step="-1" aria-label="decrease">-</button>
+              <button type="button" data-step="-1" aria-label="decrease people to detect">-</button>
               <output id="numposes-val">1</output>
-              <button type="button" data-step="1" aria-label="increase">+</button>
+              <button type="button" data-step="1" aria-label="increase people to detect">+</button>
             </div>
           </div>
         </section>
@@ -164,15 +170,19 @@
           <summary class="group-head">Advanced options <button type="button" class="info" aria-label="About advanced options" aria-expanded="false" data-info="These change what the demo shows, not measured accuracy. Lower confidence is not better. The Python CLI remains the source of truth for accuracy.">i</button></summary>
           <div class="field">
             <div class="field-label">
-              minPoseDetectionConfidence <output id="det-val">0.50</output>
+              Detection threshold
+              <button type="button" class="info" aria-label="About the detection threshold" aria-expanded="false" data-info="How sure the model must be that a person is present before it draws a skeleton at all (MediaPipe minPoseDetectionConfidence, 0-1). Higher = stricter: fewer false detections, but a faint or partly-visible body may be skipped. This changes what the demo shows, not measured accuracy.">i</button>
+              <output id="det-val">0.50</output>
             </div>
-            <input type="range" id="det" min="0" max="1" step="0.05" value="0.5" />
+            <input type="range" id="det" min="0" max="1" step="0.05" value="0.5" aria-label="Detection threshold" />
           </div>
           <div class="field">
             <div class="field-label">
-              minPosePresenceConfidence <output id="pres-val">0.50</output>
+              Landmark confidence
+              <button type="button" class="info" aria-label="About the landmark confidence threshold" aria-expanded="false" data-info="How sure the model must be about each individual joint before it keeps it (MediaPipe minPosePresenceConfidence, 0-1). Higher = stricter per point: shaky or occluded joints drop out sooner. This changes what the demo shows, not measured accuracy.">i</button>
+              <output id="pres-val">0.50</output>
             </div>
-            <input type="range" id="pres" min="0" max="1" step="0.05" value="0.5" />
+            <input type="range" id="pres" min="0" max="1" step="0.05" value="0.5" aria-label="Landmark confidence" />
           </div>
           <p class="note dim" id="apply-note">Applied automatically to the current input.</p>
 
@@ -277,6 +287,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=3" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=4" data-cfasync="false"></script>
 </body>
 </html>
