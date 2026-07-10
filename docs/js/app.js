@@ -1773,6 +1773,20 @@ el("hide-oof").addEventListener("change", (ev) => {
 
 el("resetview").addEventListener("click", () => { if (scene) { fitView(); composite(); updateInteractiveUI(); } });
 
+// Expand the stage to fill the viewport (CSS-based, works on iOS too). The
+// ResizeObserver on the stage re-fits the canvas; re-fit explicitly as well.
+function setExpanded(on) {
+  document.body.classList.toggle("stage-expanded", on);
+  const btn = el("expand-btn");
+  btn.textContent = on ? "Minimize" : "Expand";
+  btn.setAttribute("aria-pressed", String(on));
+  requestAnimationFrame(() => { sizeCanvas(); if (scene) { fitView(); composite(); } });
+}
+el("expand-btn").addEventListener("click", () => setExpanded(!document.body.classList.contains("stage-expanded")));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.body.classList.contains("stage-expanded")) setExpanded(false);
+});
+
 // display-filter checkboxes (generated) + master toggle with indeterminate state
 const filterCtl = { groups: {}, mains: {} };
 

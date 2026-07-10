@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=16" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -225,6 +225,7 @@
         <div class="placeholder" id="placeholder">
           <span id="placeholder-text">Choose an image to run pose</span>
         </div>
+        <button type="button" class="stage-btn stage-btn-tl" id="expand-btn" title="Expand the view to fill the screen" aria-pressed="false">Expand</button>
         <button type="button" class="stage-btn" id="resetview" hidden>Reset view</button>
         <button type="button" class="stage-btn stage-btn-tr" id="export-png" hidden title="Download the overlay as a PNG">Save PNG</button>
         <button type="button" class="btn primary stage-retry" id="retry-model" hidden>Retry loading model</button>
@@ -396,6 +397,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=15" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=16" data-cfasync="false"></script>
 </body>
 </html>

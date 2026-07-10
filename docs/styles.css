@@ -501,6 +501,16 @@ summary:focus-visible,
    (both can be visible at once in zoomed image/video views). */
 .stage-btn-tr { top: 12px; right: 12px; }
 #resetview { right: 92px; }
+.stage-btn-tl { top: 12px; left: 12px; right: auto; }
+
+/* expanded ("big view"): the stage fills the whole viewport. CSS-based so it
+   works everywhere, including iOS Safari (which blocks the Fullscreen API on
+   non-video elements). */
+body.stage-expanded { overflow: hidden; }
+body.stage-expanded .stage {
+  position: fixed; inset: 0; z-index: 1000;
+  min-height: 0; padding: 12px;
+}
 
 /* drag & drop affordance */
 .stage.dragover {
@@ -659,7 +669,7 @@ summary:focus-visible,
     grid-template-areas: "stage" "rail" "kin";
   }
   .rail { border-right: none; border-top: 1px solid var(--line); }
-  .stage { min-height: 46vh; }
+  .stage { min-height: 62vh; }
   /* keep the processed frame in view while its kinematics render below it */
   .kinpanel { border-top: 1px solid var(--line); }
 }
