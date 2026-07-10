@@ -365,6 +365,17 @@ body[data-kin="collapsed"] .kinpanel-toggle { writing-mode: vertical-rl; }
 .kin-metrics .kin-sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
 .kin-asym-val { font-family: var(--mono); font-weight: 600; color: var(--ink); }
 
+/* joint angles: name | range bar (with current-position dot) | current | range */
+.kin-angles { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.kin-arow { display: grid; grid-template-columns: 56px 1fr 40px 58px; align-items: center; gap: 8px; font-size: 12px; }
+.kin-aname { color: var(--ink-dim); }
+.kin-abar { position: relative; height: 4px; background: var(--line-2); border-radius: 2px; }
+.kin-abar[data-empty] { opacity: 0.4; }
+.kin-abar i { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); transform: translateX(-50%); }
+.kin-abar[data-empty] i { display: none; }
+.kin-aval { font-family: var(--mono); text-align: right; color: var(--ink); }
+.kin-arange { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); text-align: right; }
+
 /* settings action buttons */
 .actions { display: flex; gap: 8px; }
 .actions .btn { flex: 1; }

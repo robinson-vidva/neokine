@@ -505,6 +505,7 @@ function exportCSV() {
   }
   const header = ["frame", "t_seconds"];
   for (const name of LANDMARK_NAMES) header.push(name + "_x", name + "_y", name + "_visibility");
+  for (const ang of KIN_ANGLES) header.push(ang.name.replace(/\s+/g, "_") + "_deg");
   const rows = [header.join(",")];
   videoFrames.forEach((fr, k) => {
     const lm = fr.result.landmarks[0];
@@ -513,6 +514,10 @@ function exportCSV() {
       const p = lm && lm[i];
       if (p) cells.push(p.x.toFixed(6), p.y.toFixed(6), p.visibility != null ? p.visibility.toFixed(4) : "");
       else cells.push("", "", "");
+    }
+    for (const ang of KIN_ANGLES) {
+      const v = angleAtFrame(lm, ang.pts[0], ang.pts[1], ang.pts[2]);
+      cells.push(v == null ? "" : v.toFixed(1));
     }
     rows.push(cells.join(","));
   });
@@ -860,6 +865,7 @@ async function showReplayFrame(k) {
   poseCount.textContent = "poses: " + fr.result.landmarks.length;
   updateReplayUI();
   blitAllKinCursors(); // scrub/play: only move the cursor (no recompute, no metrics rebuild)
+  updateKinAngles();   // refresh the per-frame angle readouts for this frame
 }
 
 function pauseReplay() {
@@ -1005,7 +1011,77 @@ function smoothInPlace(a) {
 // cached landmarks + smoothing, so they are computed once and reused across
 // scrubs; invalidateKinCache() is called when the data or smoothing changes.
 let kinSeriesCache = null;
-function invalidateKinCache() { kinSeriesCache = null; }
+function invalidateKinCache() { kinSeriesCache = null; kinAngleRangeCache = null; }
+
+// --- joint angles (video only): the bend at a joint from three landmarks ---
+// A-B-C with B the vertex; 0 deg = fully folded, 180 = straight. Computed in the
+// image plane (2D), so it is affected by camera angle - a rough guide, not a
+// clinical goniometer. Used by the kinematics panel and the CSV export.
+const KIN_ANGLES = [
+  { name: "L elbow", pts: [11, 13, 15] },
+  { name: "R elbow", pts: [12, 14, 16] },
+  { name: "L knee",  pts: [23, 25, 27] },
+  { name: "R knee",  pts: [24, 26, 28] },
+  { name: "L hip",   pts: [11, 23, 25] },
+  { name: "R hip",   pts: [12, 24, 26] },
+];
+function angleAtFrame(lms, a, b, c) {
+  if (!lms) return null;
+  const A = lms[a], B = lms[b], C = lms[c];
+  if (!A || !B || !C) return null;
+  const v1x = A.x - B.x, v1y = A.y - B.y, v2x = C.x - B.x, v2y = C.y - B.y;
+  const m1 = Math.hypot(v1x, v1y), m2 = Math.hypot(v2x, v2y);
+  if (m1 === 0 || m2 === 0) return null;
+  let cos = (v1x * v2x + v1y * v2y) / (m1 * m2);
+  cos = Math.max(-1, Math.min(1, cos));
+  return (Math.acos(cos) * 180) / Math.PI;
+}
+// Range of motion per angle over the whole clip, computed once per process.
+let kinAngleRangeCache = null;
+function kinAngleRanges() {
+  if (kinAngleRangeCache) return kinAngleRangeCache;
+  const ranges = KIN_ANGLES.map(() => ({ min: Infinity, max: -Infinity, n: 0 }));
+  for (const fr of videoFrames) {
+    const lms = fr.result.landmarks[0];
+    KIN_ANGLES.forEach((ang, i) => {
+      const v = angleAtFrame(lms, ang.pts[0], ang.pts[1], ang.pts[2]);
+      if (v == null) return;
+      const r = ranges[i];
+      if (v < r.min) r.min = v;
+      if (v > r.max) r.max = v;
+      r.n++;
+    });
+  }
+  kinAngleRangeCache = ranges;
+  return ranges;
+}
+// Render the six angles for the currently displayed frame + their clip range.
+// Cheap enough (6 rows) to re-render on every scrub/playback frame.
+function updateKinAngles() {
+  const host = el("kin-angles"), wrap = el("kin-angles-wrap");
+  if (!host || !wrap) return;
+  if (!videoFrames.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  const ranges = kinAngleRanges();
+  const fr = videoFrames[replayIdx];
+  const lms = fr && fr.result.landmarks[0];
+  host.innerHTML = "";
+  KIN_ANGLES.forEach((ang, i) => {
+    const cur = angleAtFrame(lms, ang.pts[0], ang.pts[1], ang.pts[2]);
+    const r = ranges[i];
+    const curTxt = cur == null ? "--" : Math.round(cur) + "°";
+    const rangeTxt = r.n ? Math.round(r.min) + "-" + Math.round(r.max) + "°" : "--";
+    let pct = 0;
+    if (cur != null && r.n && r.max > r.min) pct = Math.max(0, Math.min(100, ((cur - r.min) / (r.max - r.min)) * 100));
+    const row = document.createElement("div");
+    row.className = "kin-arow";
+    row.innerHTML = '<span class="kin-aname">' + ang.name + "</span>" +
+      '<span class="kin-abar"' + (cur == null ? ' data-empty="1"' : "") + '><i style="left:' + pct.toFixed(0) + '%"></i></span>' +
+      '<span class="kin-aval">' + curTxt + "</span>" +
+      '<span class="kin-arange">' + rangeTxt + "</span>";
+    host.appendChild(row);
+  });
+}
 function kinSeries(idx) {
   if (!kinSeriesCache) kinSeriesCache = new Map();
   const hit = kinSeriesCache.get(idx);
@@ -1219,6 +1295,7 @@ function rebuildKinPlots() {
   reconcileKinPlots();
   renderAllKinPlots();
   updateKinMetrics();
+  updateKinAngles();
 }
 
 // Show/hide + expand/collapse the right-side panel. data-kin drives the grid

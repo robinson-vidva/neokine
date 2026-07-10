@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -254,6 +254,13 @@
             <div id="kin-plots" class="kin-plots-list"></div>
           </div>
           <div id="kin-metrics" class="kin-metrics"></div>
+          <div class="field" id="kin-angles-wrap" hidden>
+            <div class="field-label">
+              Joint angles
+              <button type="button" class="info" aria-label="About joint angles" aria-expanded="false" data-info="The bend at each joint in the frame you're viewing, in degrees (0 = fully folded, 180 = straight), with the range across the whole clip. Computed from on-screen 2D positions, so camera angle affects them - treat as a rough guide, not a goniometer.">i</button>
+            </div>
+            <div id="kin-angles" class="kin-angles"></div>
+          </div>
           <div class="field" id="kin-asym-wrap">
             <div class="field-label">Left-right asymmetry</div>
             <div class="row-inline">
@@ -287,6 +294,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=5" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=6" data-cfasync="false"></script>
 </body>
 </html>
