@@ -42,7 +42,10 @@ Requires a modern browser and an internet connection (for the CDN assets).
 You can **drag-and-drop** an image or video straight onto the stage, **Save
 PNG** to download the current overlay, and (in video mode) **Save CSV** to
 export the sampled per-frame landmarks (normalized image units — a
-visualization export, not a calibrated measurement).
+visualization export, not a calibrated measurement). Video mode also offers a
+one-click **sample clip** (`docs/samples/`) — AI-generated footage of a
+synthetic person (not real, not an infant) so you can try it without your own
+file.
 
 ---
 
