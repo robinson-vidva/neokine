@@ -386,7 +386,7 @@ function composite() {
       for (const i of highlight) {
         if (!shown(i)) continue;
         ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, 9, 0, 6.2832);
-        ctx.lineWidth = 2.5; ctx.strokeStyle = "#d97a00"; ctx.stroke();
+        ctx.lineWidth = 2.5; ctx.strokeStyle = "#0d7ab0"; ctx.stroke();
       }
       const labels = new Set();
       if (labelMode === "always") for (const i of LABELABLE) if (shown(i)) labels.add(i);

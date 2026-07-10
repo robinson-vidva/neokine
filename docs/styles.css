@@ -7,7 +7,7 @@
   --ink: #171b21;
   --ink-dim: #4b5563;
   --ink-faint: #616a78; /* darkened from #7b8492 (3.78:1) to meet WCAG AA (>=4.5:1) on the light panels; carries the honesty caveats */
-  --accent: #d97a00;
+  --accent: #0d7ab0;      /* deep dove-blue (brand); AA on white as text and as a button fill */
   --accent-ink: #ffffff;
   --danger: #cf1d47;
   --ok: #0f8a4f;
@@ -740,6 +740,7 @@ body.stage-expanded .stage {
     --danger: #ef5a79;
     --ok: #35c07a;
     --stage: #0b0e12;
+    --accent: #1391cc;      /* brighter dove-blue for legibility on the dark panels */
   }
   /* stage grid: faint light hairlines instead of dark-on-dark */
   .stage {
