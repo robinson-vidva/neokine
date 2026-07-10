@@ -581,6 +581,27 @@ el("image-input").addEventListener("change", (ev) => {
   handleImageFile(file);
 });
 
+// Bundled demo image: fetched from docs/samples/ and fed through the same path
+// as an uploaded file. AI-generated synthetic person - see docs/samples/README.md.
+async function loadSampleImage() {
+  const btn = el("sample-image");
+  btn.disabled = true;
+  setStatus("Loading sample image...");
+  try {
+    const res = await fetch("samples/synthetic-pose.jpg");
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    const file = new File([blob], "synthetic-pose.jpg", { type: blob.type || "image/jpeg" });
+    if (mode !== "image") switchMode("image");
+    await handleImageFile(file);
+  } catch (e) {
+    setStatus("Could not load the sample image. " + e, "error");
+  } finally {
+    btn.disabled = false;
+  }
+}
+el("sample-image").addEventListener("click", loadSampleImage);
+
 // --- webcam mode ---
 
 async function startCamera() {
