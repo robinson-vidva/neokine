@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -41,10 +41,10 @@
       <aside class="rail">
         <section class="group">
           <div class="group-head">Input</div>
-          <div class="modes">
-            <button class="mode-btn is-active" type="button" data-mode="image">Upload image</button>
-            <button class="mode-btn" type="button" data-mode="webcam">Live webcam</button>
-            <button class="mode-btn" type="button" data-mode="video">Upload video</button>
+          <div class="modes" role="group" aria-label="Input mode">
+            <button class="mode-btn is-active" type="button" data-mode="image" aria-pressed="true">Upload image</button>
+            <button class="mode-btn" type="button" data-mode="webcam" aria-pressed="false">Live webcam</button>
+            <button class="mode-btn" type="button" data-mode="video" aria-pressed="false">Upload video</button>
           </div>
 
           <div class="mode-panel" data-for="image">
@@ -225,6 +225,7 @@
         </div>
         <button type="button" class="stage-btn" id="resetview" hidden>Reset view</button>
         <button type="button" class="stage-btn stage-btn-tr" id="export-png" hidden title="Download the overlay as a PNG">Save PNG</button>
+        <button type="button" class="btn primary stage-retry" id="retry-model" hidden>Retry loading model</button>
         <div class="tooltip" id="tooltip" hidden></div>
       </main>
 
@@ -245,6 +246,7 @@
           </div>
           <label class="check small"><input type="checkbox" id="kin-smooth" /><span>Smooth (3-frame average) before velocity</span></label>
           <p class="note dim" id="kin-smooth-note" hidden>Smoothing changes the velocity estimate.</p>
+          <label class="check small"><input type="checkbox" id="kin-trails" checked /><span>Motion trails on overlay (tracked joints)</span></label>
           <div class="field">
             <div class="field-label">
               Trajectory: x (colored) and y (gray) over time
@@ -294,6 +296,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=7" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=8" data-cfasync="false"></script>
 </body>
 </html>

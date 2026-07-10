@@ -113,6 +113,7 @@ async function ensureLandmarker() {
   const variant = variantByMode[mode];
   if (landmarker && builtMode === rmode && builtVariant === variant && !dirty) return true;
   setModelState("loading", "loading model");
+  el("retry-model").hidden = true;
   try {
     const next = await createLandmarker({ ...settings, variant }, rmode, (msg) => setStatus(msg + "..."));
     if (landmarker) landmarker.close();
@@ -124,10 +125,24 @@ async function ensureLandmarker() {
     return true;
   } catch (e) {
     setModelState("error", "error");
-    setStatus("Could not load the model. Check your connection and retry. " + e, "error");
+    setStatus("Couldn't load the pose model - check your connection, then press Retry.", "error");
+    el("retry-model").hidden = false;
     return false;
   }
 }
+
+// Retry after a model-load failure: rebuild the landmarker and re-run whatever
+// input is loaded. The model + WASM come from a CDN, so a flaky connection is
+// the usual cause; this gives a one-click recovery instead of a dead end.
+el("retry-model").addEventListener("click", async () => {
+  el("retry-model").hidden = true;
+  dirty = true; // force a fresh build attempt
+  const ok = await ensureLandmarker();
+  if (!ok) return;
+  setStatus("Pose model ready.", "ready");
+  if (mode === "image" && lastImage) detectImage();
+  else if (mode === "video" && lastVideoFile) { clearVideoDirty(); processVideoFile(lastVideoFile); }
+});
 
 // --- canvas sizing + view transform ---
 
@@ -299,6 +314,29 @@ function composite() {
   ctx.clip();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+
+  // Motion trails (video only): the path each tracked joint has taken from the
+  // start of the clip up to the frame on screen, in that joint's plot color.
+  // Drawn under the skeleton so the current pose stays crisp on top.
+  if (mode === "video" && showTrails && videoFrames.length && kinSelected.size) {
+    for (const idx of kinSelected) {
+      ctx.strokeStyle = kinColor(idx);
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath();
+      let started = false;
+      for (let k = 0; k <= replayIdx && k < videoFrames.length; k++) {
+        const lm = videoFrames[k].result.landmarks[0];
+        const p = lm && lm[idx];
+        if (!p) { started = false; continue; }
+        const c = toCanvasPt(p.x, p.y);
+        if (started) ctx.lineTo(c.x, c.y); else { ctx.moveTo(c.x, c.y); started = true; }
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   const groups = ["face", "torso", "left", "right"];
 
   res.landmarks.forEach((lms, poseIdx) => {
@@ -969,6 +1007,7 @@ const KIN_JOINTS = [
 const KIN_COLORS = ["#2f6df6", "#e8590c", "#0ca678", "#ae3ec9", "#f08c00", "#e64980", "#1098ad", "#5c940d"];
 let kinSelected = new Set([15, 16]); // default: both wrists
 let kinSmooth = false;
+let showTrails = true; // draw each tracked joint's path on the video overlay
 
 // --- kinematics plot state (display only; the math below is unchanged) ---
 // One cached offscreen layer per selected joint (small multiples). Rendering is
@@ -1346,6 +1385,10 @@ el("kin-smooth").addEventListener("change", (e) => {
   rebuildKinPlots();
 });
 el("kin-pair").addEventListener("change", updateKinMetrics);
+el("kin-trails").addEventListener("change", (e) => {
+  showTrails = e.target.checked;
+  composite(); // redraw the current frame with/without trails
+});
 el("kin-zoom").addEventListener("change", (e) => {
   kinZoom = e.target.checked;
   renderAllKinPlots(); // display-only: re-render layers at the new width
@@ -1468,7 +1511,7 @@ function switchMode(next) {
   resetWorkspace();
   mode = next;
   document.body.dataset.mode = mode;
-  for (const b of document.querySelectorAll(".mode-btn[data-mode]")) b.classList.toggle("is-active", b.dataset.mode === mode);
+  for (const b of document.querySelectorAll(".mode-btn[data-mode]")) { const on = b.dataset.mode === mode; b.classList.toggle("is-active", on); b.setAttribute("aria-pressed", String(on)); }
   for (const p of document.querySelectorAll(".mode-panel")) p.hidden = p.dataset.for !== mode;
   placeholderText.textContent = PLACEHOLDER[mode];
   updateVariantUI();
@@ -1479,6 +1522,24 @@ function switchMode(next) {
 
 for (const b of document.querySelectorAll(".mode-btn[data-mode]")) {
   b.addEventListener("click", () => { if (!b.disabled) switchMode(b.dataset.mode); });
+}
+
+// Arrow-key navigation inside the segmented radiogroups (model size, duration,
+// sampling rate). Left/Up = previous, Right/Down = next; activating the option
+// runs its existing click handler (which updates aria-checked + the setting).
+for (const rg of document.querySelectorAll('[role="radiogroup"]')) {
+  rg.addEventListener("keydown", (e) => {
+    if (["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].indexOf(e.key) === -1) return;
+    const radios = [...rg.querySelectorAll('[role="radio"]')].filter((r) => !r.disabled);
+    if (!radios.length) return;
+    e.preventDefault();
+    let i = radios.indexOf(document.activeElement);
+    if (i < 0) i = radios.findIndex((r) => r.getAttribute("aria-checked") === "true");
+    const dir = (e.key === "ArrowLeft" || e.key === "ArrowUp") ? -1 : 1;
+    i = (i + dir + radios.length) % radios.length;
+    radios[i].focus();
+    radios[i].click();
+  });
 }
 
 // --- drag & drop onto the stage ---
@@ -1762,7 +1823,7 @@ function resetApp() {
   resetWorkspace();
   mode = "image";
   document.body.dataset.mode = mode;
-  for (const b of document.querySelectorAll(".mode-btn[data-mode]")) b.classList.toggle("is-active", b.dataset.mode === mode);
+  for (const b of document.querySelectorAll(".mode-btn[data-mode]")) { const on = b.dataset.mode === mode; b.classList.toggle("is-active", on); b.setAttribute("aria-pressed", String(on)); }
   for (const p of document.querySelectorAll(".mode-panel")) p.hidden = p.dataset.for !== mode;
   placeholderText.textContent = PLACEHOLDER.image;
   const adv = document.querySelector("details.advanced"); if (adv) adv.open = true; // sections expanded as on load

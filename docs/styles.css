@@ -478,6 +478,24 @@ video { display: none; }
   cursor: pointer;
 }
 .stage-btn:hover { border-color: var(--accent); }
+/* retry-after-model-failure button, centered on the stage */
+.stage-retry {
+  position: absolute; left: 50%; top: 58%;
+  transform: translate(-50%, -50%); z-index: 6;
+}
+
+/* visible keyboard focus for all interactive controls */
+button:focus-visible,
+[role="radio"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+.mode-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.file input:focus-visible + .file-btn { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Save PNG sits top-right; nudge Reset view left of it so they never overlap
    (both can be visible at once in zoomed image/video views). */
 .stage-btn-tr { top: 12px; right: 12px; }
@@ -617,7 +635,7 @@ video { display: none; }
 .infopop {
   position: fixed; z-index: 1000; max-width: 300px;
   padding: 9px 11px; border-radius: 6px;
-  background: var(--ink); color: #fff;            /* white on near-black ~= 16:1, well above 4.5:1 */
+  background: #14181d; color: #fff;               /* fixed dark surface (theme-independent) so it stays legible in dark mode too */
   font-size: 12px; line-height: 1.45;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -625,3 +643,31 @@ video { display: none; }
 
 /* always-visible honesty summary: use the darker --ink-dim (7.5:1), never grey out */
 .note.kin-caveat { color: var(--ink-dim); }
+
+/* ---- Dark theme (follows the OS setting) ------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c2129;
+    --line: #262c35;
+    --line-2: #39414c;
+    --ink: #e6e9ee;
+    --ink-dim: #b4bcc8;      /* ~9:1 on the panels */
+    --ink-faint: #8a94a2;    /* ~5.3:1 on the panels, still AA */
+    --danger: #ef5a79;
+    --ok: #35c07a;
+    --stage: #0b0e12;
+  }
+  /* stage grid: faint light hairlines instead of dark-on-dark */
+  .stage {
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(255,255,255,0.04) 23px, rgba(255,255,255,0.04) 24px),
+      repeating-linear-gradient(90deg, transparent, transparent 23px, rgba(255,255,255,0.04) 23px, rgba(255,255,255,0.04) 24px),
+      var(--stage);
+  }
+  /* floating stage buttons were white-on-dark-text; flip to a dark surface */
+  .stage-btn { background: rgba(28,33,41,0.92); color: var(--ink); border-color: var(--line-2); }
+  /* themed native checkboxes / sliders */
+  input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--accent); }
+}
