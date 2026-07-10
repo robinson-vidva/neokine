@@ -718,6 +718,7 @@ el("sample-image").addEventListener("click", loadSampleImage);
 
 let selectedCameraId = null;     // a specific chosen video input (picker)
 let cameraFacing = "user";       // 'user' (front/selfie) or 'environment' (back)
+let cameraMirror = true;         // mirror only the front camera (selfie view)
 
 async function startCamera() {
   const base = { width: { ideal: 1280 }, height: { ideal: 720 } };
@@ -736,6 +737,12 @@ async function startCamera() {
       return;
     }
   }
+  // Mirror the preview only for the front/selfie camera; the back camera should
+  // show the world as-is. Prefer the track's real facingMode; fall back to what
+  // we requested.
+  const track0 = stream.getVideoTracks && stream.getVideoTracks()[0];
+  const facing0 = (track0 && track0.getSettings && track0.getSettings().facingMode) || cameraFacing;
+  cameraMirror = facing0 !== "environment";
   video.srcObject = stream;
   try { await video.play(); } catch (e) { /* autoplay quirk; the tick loop still reads frames */ }
   if (!(await ensureLandmarker())) { stopCamera(); return; }
@@ -803,7 +810,7 @@ async function tick() {
   if (video.readyState >= 2 && landmarker) {
     try {
       const result = landmarker.detectForVideo(video, nextStreamTs());
-      scene = { source: video, iw: video.videoWidth, ih: video.videoHeight, result, mirror: true, interactive: false };
+      scene = { source: video, iw: video.videoWidth, ih: video.videoHeight, result, mirror: cameraMirror, interactive: false };
       fitView(); // webcam is always fit (no zoom/pan)
       composite();
       stage.classList.add("has-image");
