@@ -143,6 +143,8 @@ for third-party components (MediaPipe, Streamlit, OpenCV, Plotly, and others),
 which are loaded from a CDN or installed from PyPI and remain under their own
 licenses.
 
+- **[Methods & limitations](METHODS.md)** — exactly what is computed (model,
+  formulas, sampling), how the numbers were validated, and the sources of error.
 - **[Privacy Policy](PRIVACY.md)** — your media is processed on your device and
   never uploaded; no cookies, analytics, or tracking. Settings are stored
   locally in your browser only.

@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=10" />
+  <link rel="stylesheet" href="styles.css?v=11" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -290,6 +290,8 @@
       <span class="status-item ro" id="pose-count">poses: --</span>
       <span class="status-item ro grow" id="notice"></span>
       <span class="status-item ro links">
+        <button type="button" class="linkbtn" data-legal="methods">Methods</button>
+        <span aria-hidden="true">·</span>
         <button type="button" class="linkbtn" data-legal="privacy">Privacy</button>
         <span aria-hidden="true">·</span>
         <button type="button" class="linkbtn" data-legal="terms">Terms</button>
@@ -306,6 +308,38 @@
     </div>
     <div class="legal-body" id="legal-body"></div>
   </dialog>
+
+  <template id="tpl-methods">
+    <p class="legal-updated">Last updated: 2026-07-10</p>
+    <p>What neokine computes and how, so results can be interpreted and reproduced. It is a <strong>visualization demo, not a validated measurement instrument</strong>.</p>
+    <h3>Pose estimation</h3>
+    <ul>
+      <li><strong>Model:</strong> Google MediaPipe Tasks Vision <strong>Pose Landmarker</strong> &mdash; the 33-point full-body model (BlazePose GHUM topology), running client-side via WebAssembly. No server-side inference.</li>
+      <li><strong>Library:</strong> <code>@mediapipe/tasks-vision@0.10.14</code>; model variants <code>lite</code>/<code>full</code>/<code>heavy</code> (float16, version 1). "full" is the default.</li>
+      <li>The threshold sliders map to MediaPipe's <code>minPoseDetectionConfidence</code> / <code>minPosePresenceConfidence</code>. Metrics use the first detected person.</li>
+    </ul>
+    <h3>Coordinate system</h3>
+    <p>All positions are <strong>normalized image units</strong> (x, y in 0&ndash;1, a fraction of frame width/height). There is no camera calibration, depth, or physical scale, so values <strong>cannot</strong> be converted to cm, true joint degrees, or m/s.</p>
+    <h3>Kinematics (video)</h3>
+    <ul>
+      <li><strong>Displacement</strong> = path length = sum of straight-line distances between consecutive sampled frames.</li>
+      <li><strong>Mean velocity</strong> = path length &divide; elapsed time (normalized units per second).</li>
+      <li><strong>Left&ndash;right asymmetry</strong> = (L &minus; R) / (L + R) of the pair's total path length; range &minus;1&hellip;1.</li>
+      <li><strong>Joint angles</strong> = interior angle at a joint from three landmarks, in the 2D image plane (0&deg; folded, 180&deg; straight); the range is the clip min&ndash;max.</li>
+      <li>Optional 3-frame smoothing before velocity (off by default). Video is sampled (first N seconds at a chosen fps), not continuous.</li>
+    </ul>
+    <h3>Validation</h3>
+    <p>The displayed numbers were checked two ways: <strong>known-truth unit tests</strong> of the math on synthetic geometry, and <strong>self-consistency</strong> &mdash; every value was independently recomputed from the exported landmark CSV and matched on-screen. This validates that the math and pipeline are correct; it does <strong>not</strong> validate the pose model's accuracy at locating landmarks.</p>
+    <h3>Limitations &amp; sources of error</h3>
+    <ul>
+      <li><strong>2D only</strong> &mdash; out-of-plane motion and camera angle distort distances and angles; angles are projected, not anatomical.</li>
+      <li><strong>No scale</strong> &mdash; results are relative; compare within one clip, not across clips with different framing.</li>
+      <li>Camera motion looks the same as subject motion; sampling can miss fast movement.</li>
+      <li>Distal joints (wrists, ankles, feet) carry the largest positional error.</li>
+      <li>Model error propagates faithfully; lighting, occlusion, unusual poses, and <strong>infants</strong> (the model is trained mostly on adults) all reduce accuracy.</li>
+    </ul>
+    <p class="legal-foot"><a href="https://github.com/robinson-vidva/neokine/blob/main/METHODS.md" target="_blank" rel="noopener">Full methods &amp; references on GitHub &#8599;</a></p>
+  </template>
 
   <template id="tpl-privacy">
     <p class="legal-updated">Last updated: 2026-07-10</p>
@@ -360,6 +394,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=10" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=11" data-cfasync="false"></script>
 </body>
 </html>

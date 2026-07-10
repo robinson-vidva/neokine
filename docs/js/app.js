@@ -1962,11 +1962,16 @@ document.addEventListener("keydown", (e) => {
   if (!dlg || !dlg.showModal) return; // very old browser: links still work via GitHub fallback? no-op here
   const title = document.getElementById("legal-title");
   const body = document.getElementById("legal-body");
-  const tpl = { privacy: document.getElementById("tpl-privacy"), terms: document.getElementById("tpl-terms") };
+  const tpl = {
+    methods: document.getElementById("tpl-methods"),
+    privacy: document.getElementById("tpl-privacy"),
+    terms: document.getElementById("tpl-terms"),
+  };
+  const TITLES = { methods: "Methods & limitations", privacy: "Privacy Policy", terms: "Terms of Use" };
   function openLegal(which) {
     const t = tpl[which];
     if (!t) return;
-    title.textContent = which === "privacy" ? "Privacy Policy" : "Terms of Use";
+    title.textContent = TITLES[which] || "";
     body.innerHTML = "";
     body.appendChild(t.content.cloneNode(true));
     body.scrollTop = 0;
