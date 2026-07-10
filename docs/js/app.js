@@ -2148,3 +2148,12 @@ ensureLandmarker().then((ok) => {
   hideSplash();
 });
 setTimeout(hideSplash, 12000); // fail-safe: never keep the splash up forever
+
+// Register the service worker: caches the app shell + the MediaPipe model/WASM
+// so repeat visits load instantly and work offline. Progressive enhancement -
+// wrapped so a failure (or unsupported browser) never affects the app.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
