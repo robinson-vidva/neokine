@@ -558,16 +558,20 @@ video { display: none; }
   body[data-kin="collapsed"] .kinpanel-toggle { writing-mode: horizontal-tb; }
 }
 
-/* narrow: everything stacks (rail, stage, kinematics) */
+/* narrow: everything stacks. Stage (the result) goes FIRST so it is visible
+   without scrolling past the whole control rail; the Input controls are the
+   first rail section, so they sit right below the stage. */
 @media (max-width: 720px) {
   .app { height: auto; min-height: 100vh; }
   .workspace {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto;
-    grid-template-areas: "rail" "stage" "kin";
+    grid-template-areas: "stage" "rail" "kin";
   }
-  .rail { border-right: none; border-bottom: 1px solid var(--line); }
-  .stage { min-height: 52vh; }
+  .rail { border-right: none; border-top: 1px solid var(--line); }
+  .stage { min-height: 46vh; }
+  /* keep the processed frame in view while its kinematics render below it */
+  .kinpanel { border-top: 1px solid var(--line); }
 }
 
 /* (i) info affordance + tap/hover popover (rendered fixed, above the rail scroll) */
