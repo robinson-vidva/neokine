@@ -585,9 +585,49 @@ summary:focus-visible,
 .status-item.grow { flex: 1; color: var(--accent); }
 #status.error { color: var(--danger); }
 #status.ready { color: var(--ok); }
-.status-item.links { display: inline-flex; gap: 6px; }
-.status-item.links a { color: var(--ink-faint); text-decoration: none; }
-.status-item.links a:hover { color: var(--accent); text-decoration: underline; }
+.status-item.links { display: inline-flex; gap: 6px; align-items: center; }
+.linkbtn {
+  font: inherit; font-size: 11px; letter-spacing: 0.03em;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--ink-faint); text-decoration: none;
+}
+.linkbtn:hover { color: var(--accent); text-decoration: underline; }
+
+/* Privacy / Terms modal */
+.legal-dialog {
+  width: min(640px, 92vw);
+  max-height: 82vh;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.legal-dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+.legal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: var(--panel);
+}
+.legal-title { margin: 0; font-size: 16px; font-weight: 700; }
+.legal-close {
+  font: inherit; font-size: 18px; line-height: 1;
+  background: none; border: 0; cursor: pointer; color: var(--ink-dim);
+  padding: 4px 6px; border-radius: 4px;
+}
+.legal-close:hover { color: var(--ink); background: var(--panel-2); }
+.legal-body { padding: 8px 20px 22px; overflow-y: auto; max-height: calc(82vh - 56px); font-size: 13.5px; line-height: 1.55; }
+.legal-body h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); margin: 20px 0 6px; }
+.legal-body p { margin: 8px 0; color: var(--ink-dim); }
+.legal-body ul { margin: 8px 0; padding-left: 20px; color: var(--ink-dim); }
+.legal-body li { margin: 4px 0; }
+.legal-body strong { color: var(--ink); }
+.legal-body code { font-family: var(--mono); font-size: 12px; background: var(--panel-2); padding: 1px 5px; border-radius: 3px; }
+.legal-body a { color: var(--accent); }
+.legal-updated { font-family: var(--mono); font-size: 11px; color: var(--ink-faint) !important; }
+.legal-foot { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); }
 
 /* medium: kinematics panel stacks BELOW the canvas (never squeezes it) */
 @media (max-width: 1100px) {

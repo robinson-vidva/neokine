@@ -1954,6 +1954,31 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowRight") { e.preventDefault(); pauseReplay(); showReplayFrame(replayIdx + 1); }
 });
 
+// --- Privacy / Terms modal ---
+// Shows the policy text in an accessible <dialog> (Escape + backdrop close,
+// focus handled by the browser) instead of navigating away to GitHub.
+(function () {
+  const dlg = document.getElementById("legal-dialog");
+  if (!dlg || !dlg.showModal) return; // very old browser: links still work via GitHub fallback? no-op here
+  const title = document.getElementById("legal-title");
+  const body = document.getElementById("legal-body");
+  const tpl = { privacy: document.getElementById("tpl-privacy"), terms: document.getElementById("tpl-terms") };
+  function openLegal(which) {
+    const t = tpl[which];
+    if (!t) return;
+    title.textContent = which === "privacy" ? "Privacy Policy" : "Terms of Use";
+    body.innerHTML = "";
+    body.appendChild(t.content.cloneNode(true));
+    body.scrollTop = 0;
+    dlg.showModal();
+  }
+  for (const b of document.querySelectorAll(".linkbtn[data-legal]")) {
+    b.addEventListener("click", () => openLegal(b.dataset.legal));
+  }
+  document.getElementById("legal-close").addEventListener("click", () => dlg.close());
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); }); // click backdrop to close
+})();
+
 // initial load
 loadSettings();
 applySettingsToUI();

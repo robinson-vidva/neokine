@@ -17,7 +17,7 @@
   <meta name="twitter:description" content="Client-side pose visualization: MediaPipe skeleton + simple kinematics. Nothing is uploaded. Not a diagnostic tool." />
   <meta name="twitter:image" content="https://robinsonvidva.com/neokine/samples/synthetic-pose.jpg" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23171b21'/%3E%3Ccircle cx='8' cy='8' r='3.2' fill='%2312b886'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body data-mode="image">
   <div class="app">
@@ -290,17 +290,76 @@
       <span class="status-item ro" id="pose-count">poses: --</span>
       <span class="status-item ro grow" id="notice"></span>
       <span class="status-item ro links">
-        <a href="https://github.com/robinson-vidva/neokine/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
+        <button type="button" class="linkbtn" data-legal="privacy">Privacy</button>
         <span aria-hidden="true">·</span>
-        <a href="https://github.com/robinson-vidva/neokine/blob/main/TERMS.md" target="_blank" rel="noopener">Terms</a>
+        <button type="button" class="linkbtn" data-legal="terms">Terms</button>
       </span>
       <span class="status-item ro">MediaPipe Tasks Vision / client-side</span>
     </footer>
   </div>
 
+  <!-- Privacy / Terms modal (populated from the templates below) -->
+  <dialog id="legal-dialog" class="legal-dialog" aria-labelledby="legal-title">
+    <div class="legal-head">
+      <h2 id="legal-title" class="legal-title"></h2>
+      <button type="button" class="legal-close" id="legal-close" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="legal-body" id="legal-body"></div>
+  </dialog>
+
+  <template id="tpl-privacy">
+    <p class="legal-updated">Last updated: 2026-07-10</p>
+    <p><strong>neokine</strong> is a browser-based pose-visualization demo, designed to keep your data on your own device.</p>
+    <h3>The short version</h3>
+    <ul>
+      <li>Your images, videos, and webcam frames <strong>never leave your device</strong>. All pose estimation runs locally in your browser.</li>
+      <li>Nothing you analyze is uploaded, stored on a server, or shared.</li>
+      <li>No accounts, no cookies, no analytics, no tracking, no advertising.</li>
+    </ul>
+    <h3>What is processed, and where</h3>
+    <p><strong>Images / videos / webcam</strong> are decoded and analyzed entirely in your browser's memory and discarded when you close or reset the page. <strong>Exports</strong> (Save PNG / Save CSV) are generated in your browser and saved directly to your device &mdash; never transmitted.</p>
+    <h3>Local storage on your device</h3>
+    <p>neokine saves your <strong>display preferences</strong> in your browser's <code>localStorage</code> (key <code>neokine.settings</code>) so the app reopens the way you left it. It stays on your device, is never sent anywhere, and can be cleared any time via your browser's site data. No cookies are used.</p>
+    <h3>Third parties your browser contacts</h3>
+    <p>To run, the app downloads assets at load time. These providers receive only standard request metadata (such as your IP address and which file was requested) &mdash; <strong>not</strong> your images or video:</p>
+    <ul>
+      <li>MediaPipe library + WASM runtime &mdash; <code>cdn.jsdelivr.net</code></li>
+      <li>Pose model file &mdash; <code>storage.googleapis.com</code></li>
+      <li>Hosting &mdash; GitHub Pages, fronted by Cloudflare on the custom domain</li>
+    </ul>
+    <h3>Webcam</h3>
+    <p>Live webcam mode uses your browser's standard camera-permission prompt. The feed draws the overlay in real time; frames are processed in memory and discarded &mdash; never recorded or uploaded. You can revoke access any time.</p>
+    <h3>Children's data</h3>
+    <p>neokine is a general visualization demo, not a data-collecting service. It is <strong>not</strong> an infant-monitoring or diagnostic tool and collects no personal information from anyone, including children.</p>
+    <p class="legal-foot"><a href="https://github.com/robinson-vidva/neokine/blob/main/PRIVACY.md" target="_blank" rel="noopener">Canonical version on GitHub &#8599;</a></p>
+  </template>
+
+  <template id="tpl-terms">
+    <p class="legal-updated">Last updated: 2026-07-10</p>
+    <p>By using <strong>neokine</strong> you agree to these terms. If you do not agree, do not use the app.</p>
+    <h3>What neokine is</h3>
+    <p>A <strong>visualization demo</strong> that runs pose estimation (MediaPipe) in your browser to draw a skeleton and plot simple kinematics (displacement, velocity, joint angles, left&ndash;right asymmetry).</p>
+    <h3>Not a medical device &mdash; no clinical use</h3>
+    <ul>
+      <li>neokine is <strong>not a medical device</strong> and is not intended for diagnosis, screening, monitoring, treatment, or any clinical decision-making.</li>
+      <li>It makes no clinical claims and is <strong>not</strong> an infant-assessment tool, despite its theme.</li>
+      <li>Outputs are estimates in normalized image units with no calibration, depth, or physical scale &mdash; they cannot be treated as measurements.</li>
+      <li>Do not rely on neokine for any health, safety, or medical purpose. Consult a qualified professional for medical questions.</li>
+    </ul>
+    <h3>Provided &ldquo;as is&rdquo;</h3>
+    <p>neokine is provided <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without warranties of any kind</strong>, express or implied. Pose estimates come from a third-party model and may be wrong; the visualization faithfully reflects the model's output, including its errors.</p>
+    <h3>Limitation of liability</h3>
+    <p>To the maximum extent permitted by law, the authors and contributors are not liable for any damages arising out of or in connection with the use of, or inability to use, neokine &mdash; including decisions made on the basis of its output.</p>
+    <h3>Acceptable use</h3>
+    <p>Use neokine lawfully, and only process images, video, or camera input you have the right to use. You are responsible for the content you analyze and for the privacy and consent rights of anyone depicted.</p>
+    <h3>Software license &amp; privacy</h3>
+    <p>The source code is licensed under the <a href="https://github.com/robinson-vidva/neokine/blob/main/LICENSE" target="_blank" rel="noopener">Apache License 2.0</a>. Your use is also covered by the Privacy Policy &mdash; in short, your media is processed on your device and never uploaded.</p>
+    <p class="legal-foot"><a href="https://github.com/robinson-vidva/neokine/blob/main/TERMS.md" target="_blank" rel="noopener">Canonical version on GitHub &#8599;</a></p>
+  </template>
+
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=9" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=10" data-cfasync="false"></script>
 </body>
 </html>
