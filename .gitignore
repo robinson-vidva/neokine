@@ -11,3 +11,6 @@ __pycache__/
 # temporary test/probe assets created during development
 docs/_*
 _probe*
+
+# local Claude Code config
+.claude/

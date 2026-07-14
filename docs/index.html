@@ -166,6 +166,15 @@
               <button type="button" data-step="1" aria-label="increase people to detect">+</button>
             </div>
           </div>
+          <div class="field">
+            <div class="field-label">
+              Pipeline
+              <button type="button" class="info" aria-label="About the Enhanced pipeline" aria-expanded="false" data-info="Enhanced is the same model with SyRIP-tuned inference: it upscales small images and tries 0/90/180/270 degree rotations, keeping the orientation the model is most confident about. On the SyRIP infant test set this lifted detection from 94.6% to 99.2% with zero lost detections. It is not retrained weights. Applies to still images.">i</button>
+            </div>
+            <label class="check"><input type="checkbox" id="enhanced" /><span>Enhanced (SyRIP-tuned)</span></label>
+            <p class="note dim">Upscale + rotation best-of-angle. Recovers inverted / small / crawling poses. Applies to images.</p>
+            <p class="note dim warn" id="enhanced-note" hidden>Enhanced applies to still images; webcam and video run the standard model.</p>
+          </div>
         </section>
 
         <section class="group">
@@ -414,6 +423,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=19" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=20" data-cfasync="false"></script>
 </body>
 </html>

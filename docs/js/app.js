@@ -7,6 +7,7 @@ import {
   LANDMARK_NAMES, CONNECTIONS, REGION_COLORS,
   GROUPS, GROUP_OF, LABELABLE, MAJOR, jointColor,
 } from "./pose.js";
+import { detectEnhanced } from "./enhance.js";
 
 const el = (id) => document.getElementById(id);
 const modelState = el("model-state");
@@ -27,6 +28,11 @@ const tooltip = el("tooltip");
 // stays reachable in the panel).
 const variantByMode = { image: "full", webcam: "full", video: "full" };
 const settings = { numPoses: 1, minDetection: 0.5, minPresence: 0.5 };
+// Enhanced = the SyRIP-tuned inference pipeline (upscale + rotation
+// best-of-angle), ported from the analysis project's core/pipeline.py. It
+// recovers inverted / small / crawling poses the plain model misses. Applies
+// to IMAGE mode only; webcam/video stay vanilla to protect latency.
+let enhanced = false;
 
 // Sampling knobs (user-selectable). Duration cap in seconds and sampling rate
 // in fps; total frames hard-capped regardless of selection.
@@ -658,14 +664,17 @@ async function detectImage() {
   if (!(await ensureLandmarker())) return;
   if (myRun !== imageRunId || mode !== "image" || !lastImage) return;
   try {
-    const result = landmarker.detect(lastImage);
+    const result = enhanced ? detectEnhanced(landmarker, lastImage) : landmarker.detect(lastImage);
     setImageScene(lastImage, result);
     composite();
     stage.classList.add("has-image");
     updateInteractiveUI();
     const n = result.landmarks.length;
     poseCount.textContent = "poses: " + n;
-    setStatus(n > 0 ? "Pose detected." : "No pose detected in this image.", n > 0 ? "ready" : "error");
+    let msg = n > 0 ? "Pose detected." : "No pose detected in this image.";
+    if (enhanced && n > 0 && result.meta && result.meta.angle) msg = "Pose detected (enhanced: " + result.meta.angle + "° rotation).";
+    else if (enhanced && n > 0) msg = "Pose detected (enhanced).";
+    setStatus(msg, n > 0 ? "ready" : "error");
   } catch (e) {
     setStatus("Failed to process image. " + e, "error");
   } finally {
@@ -1713,6 +1722,19 @@ el("variant").addEventListener("click", async (ev) => {
   else if (mode === "video") markVideoDirty(); // reprocess is expensive - wait for Update
 });
 
+// Enhanced toggle (SyRIP-tuned: upscale + rotation best-of-angle). Applies to
+// image mode; on webcam/video it is inert (vanilla runs) to protect latency.
+const enhancedToggle = el("enhanced");
+if (enhancedToggle) {
+  enhancedToggle.addEventListener("change", () => {
+    enhanced = enhancedToggle.checked;
+    const note = el("enhanced-note");
+    if (note) note.hidden = !(enhanced && mode !== "image");
+    saveSettings();
+    if (mode === "image" && lastImage) detectImage();
+  });
+}
+
 // Auto-rerun is only for IMAGE mode (cheap). Video mode uses markVideoDirty +
 // Update; webcam applies on the next frame.
 let rerunTimer = null;
@@ -2046,6 +2068,7 @@ function saveSettings() {
       labelMode,
       interactions: { ...interactions },
       hideOOF,
+      enhanced,
     }));
   } catch (e) { /* storage blocked (private mode / disabled) - ignore */ }
 }
@@ -2064,6 +2087,7 @@ function loadSettings() {
     if (typeof s.interactions[k] === "boolean") interactions[k] = s.interactions[k];
   }
   if (typeof s.hideOOF === "boolean") hideOOF = s.hideOOF;
+  if (typeof s.enhanced === "boolean") enhanced = s.enhanced;
 }
 // Push the current settings globals into their controls (init + reset).
 function applySettingsToUI() {
@@ -2077,6 +2101,7 @@ function applySettingsToUI() {
   el("int-pin").checked = interactions.pin;
   el("int-zoom").checked = interactions.zoom;
   el("hide-oof").checked = hideOOF;
+  const et = el("enhanced"); if (et) et.checked = enhanced;
 }
 
 // --- keyboard shortcuts (video playback) ---
