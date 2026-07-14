@@ -50,6 +50,13 @@ Requires a modern browser and an internet connection (for the CDN assets).
   **drag-and-drop** onto the stage; or one-click **sample image / clip**
   (`docs/samples/`) — AI-generated synthetic people (not real, not infants) so
   you can try it with no file of your own.
+- **Pipeline — Vanilla vs Enhanced:** a toggle for the **Enhanced (SyRIP-tuned)**
+  mode. Same model, tuned inference (not retrained weights): it upscales small
+  images and tries 0/90/180/270° rotations, keeping the orientation the model is
+  most confident about. On the SyRIP infant test set this lifted detection from
+  94.6% to 99.2% with zero lost detections — recovering inverted / small /
+  crawling poses the plain model misses. Applies to still images. See
+  [METHODS](METHODS.md#enhanced-syrip-tuned-inference).
 - **Overlay:** region-colored skeleton, per-joint/per-group display filters,
   hover tooltips, click-to-pin, zoom/pan, and **motion trails** (a tracked
   joint's path across the video frames).

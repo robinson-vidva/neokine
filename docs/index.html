@@ -346,6 +346,7 @@
       <li><strong>Model:</strong> Google MediaPipe Tasks Vision <strong>Pose Landmarker</strong> &mdash; the 33-point full-body model (BlazePose GHUM topology), running client-side via WebAssembly. No server-side inference.</li>
       <li><strong>Library:</strong> <code>@mediapipe/tasks-vision@0.10.14</code>; model variants <code>lite</code>/<code>full</code>/<code>heavy</code> (float16, version 1). "full" is the default.</li>
       <li>The threshold sliders map to MediaPipe's <code>minPoseDetectionConfidence</code> / <code>minPosePresenceConfidence</code>. Metrics use the first detected person.</li>
+      <li><strong>Enhanced (SyRIP-tuned):</strong> an optional mode &mdash; same model, tuned inference (not retrained weights). It upscales small images and tries 0/90/180/270&deg; rotations, keeping the most confident orientation. On the SyRIP infant test set this raised detection from 94.6% to 99.2% with zero lost detections. Applies to still images.</li>
     </ul>
     <h3>Coordinate system</h3>
     <p>All positions are <strong>normalized image units</strong> (x, y in 0&ndash;1, a fraction of frame width/height). There is no camera calibration, depth, or physical scale, so values <strong>cannot</strong> be converted to cm, true joint degrees, or m/s.</p>
