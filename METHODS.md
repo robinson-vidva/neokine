@@ -22,6 +22,26 @@ measurement instrument** (see [Terms](TERMS.md)).
 - **Scope:** metrics use the first detected person (`landmarks[0]`). Additional
   people, if any, are drawn but not analyzed.
 
+## Enhanced (SyRIP-tuned) inference
+
+An optional **Enhanced** pipeline (Model → Pipeline toggle) wraps the same
+MediaPipe model with inference-time improvements tuned on the **SyRIP** infant
+dataset. It is **not retrained weights** — the model is unchanged.
+
+- **What it does** (`docs/js/enhance.js`): (1) upscales small images so the
+  short side is ≥ 512 px; (2) runs **rotation test-time augmentation** — the
+  frame is analyzed at 0/90/180/270°, and the orientation with the highest mean
+  landmark visibility is kept, with keypoints mapped back to the original frame.
+- **Why:** MediaPipe assumes a roughly upright, isolated person. Infants are
+  often crawling, prone, photographed top-down, or small in frame. On the SyRIP
+  held-out test set (500 images) Enhanced raised the detection rate from
+  **94.6% to 99.2% with zero lost detections**, recovering poses the plain model
+  misses entirely.
+- **Limits:** it recovers *detections*; it does not fix the lower-limb
+  localization error that is inherent to a model trained on adults. It applies
+  to **still images** only — webcam and video run the plain model to keep
+  latency low. Full analysis: the SyRIP analysis project (separate repo).
+
 ## Coordinate system
 
 All positions are in **normalized image units**: `x` and `y` in `[0, 1]`, i.e.
