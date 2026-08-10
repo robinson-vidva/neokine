@@ -636,6 +636,123 @@ function exportCSV() {
 el("export-png").addEventListener("click", exportPNG);
 el("export-csv").addEventListener("click", exportCSV);
 
+// --- overlay video / GIF export (video mode) ---
+// Both replay the processed frames through the same canvas the app draws to, so
+// the export captures exactly what's on screen (skeleton + motion trails). The
+// frame is fit (no zoom) first so the whole frame is in view.
+function delay(ms) { return new Promise((r) => setTimeout(r, ms)); }
+function setExportBusy(on, msg) {
+  el("export-video").disabled = on;
+  el("export-gif").disabled = on;
+  const note = el("export-note");
+  if (on && msg) { note.hidden = false; note.textContent = msg; }
+  else { note.hidden = true; note.textContent = ""; }
+}
+
+async function exportOverlayVideo() {
+  if (mode !== "video" || !videoFrames.length) { setStatus("Process a video first, then export.", "error"); return; }
+  if (typeof MediaRecorder === "undefined" || !canvas.captureStream) {
+    setStatus("This browser can't record video. Try Save GIF instead.", "error"); return;
+  }
+  pauseReplay(); fitView(); composite();
+  // MP4 where the browser supports it (Safari, newer Chrome), else WebM.
+  const mime =
+    MediaRecorder.isTypeSupported("video/mp4;codecs=avc1") ? "video/mp4;codecs=avc1" :
+    MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" :
+    MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" :
+    "video/webm";
+  const ext = mime.indexOf("mp4") >= 0 ? "mp4" : "webm";
+  let stream = canvas.captureStream(0);
+  let track = stream.getVideoTracks()[0];
+  const manual = typeof track.requestFrame === "function";
+  if (!manual) { track.stop(); stream = canvas.captureStream(videoFps); track = stream.getVideoTracks()[0]; }
+  let rec;
+  try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6000000 }); }
+  catch (e) { setStatus("Video recording isn't supported here. Try Save GIF. " + e, "error"); return; }
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  const stopped = new Promise((res) => (rec.onstop = res));
+  setExportBusy(true, "Recording video…");
+  try {
+    rec.start();
+    const dt = 1000 / videoFps;
+    for (let k = 0; k < videoFrames.length; k++) {
+      await showReplayFrame(k);
+      if (manual) track.requestFrame();
+      await delay(dt);
+      setExportBusy(true, "Recording video… " + Math.round(((k + 1) / videoFrames.length) * 100) + "%");
+    }
+    await delay(150);
+    rec.stop();
+    await stopped;
+  } finally { track.stop(); setExportBusy(false); }
+  const blob = new Blob(chunks, { type: mime });
+  downloadBlob(blob, "neokine-overlay." + ext);
+  setStatus("Saved overlay " + ext.toUpperCase() + " (" + videoFrames.length + " frames, " + (blob.size / 1048576).toFixed(1) + " MB).", "ready");
+}
+
+async function exportOverlayGif() {
+  if (mode !== "video" || !videoFrames.length) { setStatus("Process a video first, then export.", "error"); return; }
+  pauseReplay(); fitView(); composite();
+  let mod;
+  setExportBusy(true, "Loading GIF encoder…");
+  try { mod = await import("../vendor/gifenc.js"); }
+  catch (e) { setExportBusy(false); setStatus("Couldn't load the GIF encoder. " + e, "error"); return; }
+  const { GIFEncoder, quantize, applyPalette } = mod;
+
+  // Keep GIFs quick + reasonably sized: cap the long edge, cap the frame count
+  // (sampling every Nth frame), and quantize ONE shared palette for the whole
+  // clip instead of per frame (the per-frame quantize is what makes it crawl).
+  const MAXDIM = 360, MAXFRAMES = 48;
+  const n = videoFrames.length;
+  const step = Math.max(1, Math.ceil(n / MAXFRAMES));
+  const delayMs = Math.round(1000 / videoFps) * step;
+  const off = document.createElement("canvas");
+  const octx = off.getContext("2d", { willReadFrequently: true });
+
+  async function frameRGBA(k) {
+    await showReplayFrame(k);
+    const cw = canvas.width, ch = canvas.height;
+    const s = Math.min(1, MAXDIM / Math.max(cw, ch));
+    const w = Math.max(1, Math.round(cw * s)), h = Math.max(1, Math.round(ch * s));
+    if (off.width !== w) off.width = w;
+    if (off.height !== h) off.height = h;
+    octx.fillStyle = "#000"; octx.fillRect(0, 0, w, h); // solid letterbox (GIF has no smooth alpha)
+    octx.drawImage(canvas, 0, 0, cw, ch, 0, 0, w, h);
+    return { data: octx.getImageData(0, 0, w, h).data, w, h };
+  }
+
+  try {
+    // One shared palette from a few representative frames (start / middle / end).
+    setExportBusy(true, "Building GIF… palette");
+    const picks = [...new Set([0, n >> 1, n - 1])];
+    const parts = [];
+    let w = 0, h = 0;
+    for (const i of picks) { const f = await frameRGBA(i); w = f.w; h = f.h; parts.push(f.data); }
+    const merged = new Uint8Array(parts.reduce((s, d) => s + d.length, 0));
+    for (let o = 0, i = 0; i < parts.length; o += parts[i].length, i++) merged.set(parts[i], o);
+    const palette = quantize(merged, 256);
+
+    const gif = GIFEncoder();
+    const total = Math.ceil(n / step);
+    let c = 0;
+    for (let k = 0; k < n; k += step) {
+      const f = await frameRGBA(k);
+      const index = applyPalette(f.data, palette);
+      gif.writeFrame(index, f.w, f.h, { palette, delay: delayMs });
+      setExportBusy(true, "Building GIF… " + Math.round((++c / total) * 100) + "%");
+      await delay(0); // yield so the progress note repaints
+    }
+    gif.finish();
+    const blob = new Blob([gif.bytes()], { type: "image/gif" });
+    downloadBlob(blob, "neokine-overlay.gif");
+    setStatus("Saved overlay GIF (" + total + " frames, " + (blob.size / 1048576).toFixed(1) + " MB).", "ready");
+  } finally { setExportBusy(false); }
+}
+
+el("export-video").addEventListener("click", exportOverlayVideo);
+el("export-gif").addEventListener("click", exportOverlayGif);
+
 // --- image mode ---
 
 function loadImage(file) {

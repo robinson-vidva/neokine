@@ -325,6 +325,14 @@ input[type="range"]::-moz-range-thumb {
 }
 .btn.step:hover { color: var(--ink); border-color: var(--line-2); }
 
+/* overlay export (video / gif) */
+.replay-export { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.replay-export .field-label { margin-bottom: 7px; }
+.replay-export-btns { display: flex; gap: 8px; }
+.replay-export-btns .btn { flex: 1; }
+.btn.small { padding: 6px 10px; font-size: 12px; }
+#export-note { margin-top: 7px; }
+
 /* disabled controls while a video is processing */
 .segmented button:disabled, .stepper button:disabled,
 input[type="range"]:disabled { opacity: 0.45; cursor: not-allowed; }

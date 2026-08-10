@@ -39,3 +39,6 @@ streamlit-webrtc
 
 PyAV (av)
   BSD 3-Clause License — https://github.com/PyAV-Org/PyAV/blob/main/LICENSE.txt
+
+gifenc (bundled in docs/vendor/, used for the web app's GIF export)
+  MIT License — https://github.com/mattdesl/gifenc/blob/master/LICENSE.md

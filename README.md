@@ -57,8 +57,9 @@ Requires a modern browser and an internet connection (for the CDN assets).
   asymmetry index `(L − R)/(L + R)`, and **joint angles** (elbow/knee/hip, with
   range of motion). All in normalized image units — a visualization, not a
   calibrated measurement.
-- **Export:** **Save PNG** (the overlay) and **Save CSV** (per-frame landmarks +
-  joint angles).
+- **Export:** **Save PNG** (the overlay), **Save CSV** (per-frame landmarks +
+  joint angles), and — for a processed video — **Save video** (MP4/WebM) or
+  **Save GIF** of the animated overlay.
 - **Quality of life:** remembers your settings across visits (localStorage),
   **dark mode** (follows your OS), video keyboard shortcuts (Space = play/pause,
   ←/→ = step frames), keyboard-navigable controls, and a retry button if the

@@ -24,7 +24,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="neokine" />
-  <link rel="stylesheet" href="styles.css?v=19" />
+  <link rel="stylesheet" href="styles.css?v=20" />
 </head>
 <body data-mode="image">
   <div class="splash" id="splash" role="status" aria-label="Loading neokine">
@@ -120,6 +120,14 @@
                 </span>
               </div>
               <p class="note dim" id="rp-notice">Sampled playback (~10 fps), not real-time. These are the sampled frames, not the source video.</p>
+              <div class="replay-export">
+                <span class="field-label">Export overlay</span>
+                <div class="replay-export-btns">
+                  <button type="button" class="btn small" id="export-video" title="Record the overlay as a video file">Save video</button>
+                  <button type="button" class="btn small" id="export-gif" title="Save the overlay as an animated GIF">Save GIF</button>
+                </div>
+                <p class="note dim" id="export-note" hidden></p>
+              </div>
             </div>
 
           </div>
@@ -414,6 +422,6 @@
   <!-- data-cfasync="false" keeps Cloudflare Rocket Loader from rewriting this
        ES module's script tag (it turns type="module" into type="<hash>-module"),
        which breaks the app on the live site but not on localhost. -->
-  <script type="module" src="js/app.js?v=19" data-cfasync="false"></script>
+  <script type="module" src="js/app.js?v=20" data-cfasync="false"></script>
 </body>
 </html>
