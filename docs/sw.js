@@ -11,7 +11,7 @@
 //     (fast from cache, refreshed in the background)
 //
 // Bump VERSION to invalidate all caches on the next activation.
-const VERSION = "neokine-v1";
+const VERSION = "neokine-v2";
 const CORE = "core-" + VERSION; // same-origin shell
 const CDN = "cdn-" + VERSION;   // cross-origin model/lib/wasm
 
